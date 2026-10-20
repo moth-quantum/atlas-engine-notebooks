@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+__marimo__/
+*.ipynb_checkpoints
+blur/outputs/*.ipynb
+blur/outputs/*.html
