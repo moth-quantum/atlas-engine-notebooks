@@ -39,10 +39,15 @@ def _():
     _uploaded = {}
 
     def upload(data, name):
-        """POST /api/v1/assets once per distinct file; returns its asset_id."""
+        """Upload once per distinct file (create, PUT to the presigned URL, complete); returns its asset_id."""
         key = hashlib.sha256(data).hexdigest()
         if key not in _uploaded:
-            _uploaded[key] = api("POST", "/api/v1/assets", files={"file": (name, io.BytesIO(data), "image/png")}).json()["asset_id"]
+            created = api("POST", "/api/v1/assets", json={"filename": name, "content_type": "image/png", "size_bytes": len(data)}).json()
+            up = created["upload"]
+            r = requests.request(up.get("method", "PUT"), up["url"], data=data, headers=up["headers"], timeout=60)  # presigned: no bearer header
+            if r.status_code >= 400:
+                raise RuntimeError(f"upload {created['asset_id']} -> {r.status_code}: {r.text[:300]}")
+            _uploaded[key] = api("POST", f"/api/v1/assets/{created['asset_id']}/complete").json()["asset_id"]
         return _uploaded[key]
 
     def blur(params, image, mask=None):
