@@ -6,27 +6,24 @@ app = marimo.App(width="medium", app_title="Blur")
 
 @app.cell
 def _():
-    # cell: setup
+    # cell: moth client
+    # Engine-agnostic: copy this cell into any engine notebook unchanged.
     import hashlib
-    import io
+    import mimetypes
     import os
     import time
 
     import marimo as mo
-    import numpy as np
     import requests
-    from PIL import Image
 
     # Credentials come from the environment only. Atlas injects MOTH_API_KEY into a forked
     # notebook; locally, export a key created on the Atlas "API keys" page.
     API_BASE = os.environ.get("MOTH_API_BASE", "https://api.mothquantum.com").rstrip("/")
     API_KEY = os.environ.get("MOTH_API_KEY", "")
     AUTORUN = os.environ.get("MOTH_AUTORUN") == "1"  # headless exports: run every cell without pressing buttons
-    ENGINE_ID = "blur-v1"
-    REPO_RAW = "https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur"
 
     s = requests.Session()
-    s.headers.update({"User-Agent": "atlas-engine-notebooks/blur", "Accept": "application/json"})
+    s.headers.update({"User-Agent": "atlas-engine-notebooks", "Accept": "application/json"})
     if API_KEY:
         s.headers["Authorization"] = f"Bearer {API_KEY}"
 
@@ -38,33 +35,70 @@ def _():
 
     _uploaded = {}
 
-    def upload(data, name):
-        """POST /api/v1/assets once per distinct file; returns its asset_id."""
+    def upload(data, name, content_type=None):
+        """Upload once per distinct file (create, PUT to the presigned URL, complete); returns its asset_id.
+        content_type defaults to a guess from the filename."""
+        content_type = content_type or mimetypes.guess_type(name)[0] or "application/octet-stream"
         key = hashlib.sha256(data).hexdigest()
         if key not in _uploaded:
-            _uploaded[key] = api("POST", "/api/v1/assets", files={"file": (name, io.BytesIO(data), "image/png")}).json()["asset_id"]
+            created = api("POST", "/api/v1/assets", json={"filename": name, "content_type": content_type, "size_bytes": len(data)}).json()
+            up = created["upload"]
+            r = requests.request(up.get("method", "PUT"), up["url"], data=data, headers=up["headers"], timeout=60)  # presigned: no bearer header
+            if r.status_code >= 400:
+                raise RuntimeError(f"upload {created['asset_id']} -> {r.status_code}: {r.text[:300]}")
+            _uploaded[key] = api("POST", f"/api/v1/assets/{created['asset_id']}/complete").json()["asset_id"]
         return _uploaded[key]
 
-    def blur(params, image, mask=None):
-        """Run one Blur job: upload, submit, poll, download. Returns (float RGB array in [0, 1], seconds)."""
-        t0 = time.perf_counter()
-        input_files = {"image": upload(image, "image.png")}
-        if mask is not None:
-            input_files["mask"] = upload(mask, "mask.png")
-        job_id = api("POST", f"/api/v1/engines/{ENGINE_ID}/process", json={"input_files": input_files, "params": params}).json()["job_id"]
+    def submit(engine_id, params, input_files=None):
+        """Start a job; returns its job_id. input_files maps slot -> asset_id."""
+        body = {"params": params, **({"input_files": input_files} if input_files else {})}
+        return api("POST", f"/api/v1/engines/{engine_id}/process", json=body).json()["job_id"]
+
+    def wait(job_id, interval=1.5):
+        """Poll until the job completes; raises if it fails or is cancelled."""
         while True:
             job = api("GET", f"/api/v1/jobs/{job_id}/status").json()
             if job["status"] == "completed":
-                break
+                return
             if job["status"] in ("failed", "cancelled"):
                 raise RuntimeError(f"job {job_id} {job['status']}: {job.get('error')}")
-            time.sleep(1.5)
-        outputs = api("GET", f"/api/v1/jobs/{job_id}/result").json().get("outputs") or []
-        out = next((o for o in outputs if o.get("slot") == "result"), outputs[0] if outputs else None)
+            time.sleep(interval)
+
+    def fetch(job_id, slot="result"):
+        """Bytes of the output in `slot` (or the first output), or the inline JSON result for engines
+        that produce no file."""
+        res = api("GET", f"/api/v1/jobs/{job_id}/result").json()
+        outputs = res.get("outputs") or []
+        out = next((o for o in outputs if o.get("slot") == slot), outputs[0] if outputs else None)
         if out is None:
-            raise RuntimeError(f"job {job_id} finished without an output")
-        data = requests.get(out["url"], timeout=60).content  # presigned: sent without the bearer header
-        return as_float(Image.open(io.BytesIO(data))), time.perf_counter() - t0
+            if res.get("result") is None:
+                raise RuntimeError(f"job {job_id} finished without an output")
+            return res["result"]
+        url = out.get("url") or api("GET", f"/api/v1/assets/{out['output_asset_id']}/download").json()["download_url"]
+        return requests.get(url, timeout=60).content  # presigned: sent without the bearer header
+
+    def run_job(engine_id, params, input_files=None, slot="result"):
+        """submit -> wait -> fetch. Returns (fetch's result, seconds)."""
+        t0 = time.perf_counter()
+        job_id = submit(engine_id, params, input_files)
+        wait(job_id)
+        return fetch(job_id, slot), time.perf_counter() - t0
+
+    if not API_KEY:
+        mo.output.replace(mo.callout(mo.md(
+            "`MOTH_API_KEY` is not set, so the cells that call the engine will fail. "
+            "Create a key on the Atlas **API keys** page, export it, and restart the kernel."), kind="warn"))
+    return AUTORUN, mo, os, requests, run_job, upload
+
+
+@app.cell
+def _(mo):
+    # cell: image helpers
+    # Demo-only: convert between images and float arrays, and lay out labelled image grids.
+    import io
+
+    import numpy as np
+    from PIL import Image
 
     def as_float(img):
         return np.asarray(img.convert("RGB"), float) / 255.0
@@ -81,17 +115,31 @@ def _():
     def row(panels, **kw):
         return mo.hstack([panel(k, v, **kw) for k, v in panels.items()], justify="start", gap=1, wrap=True)
 
-    if not API_KEY:
-        mo.output.replace(mo.callout(mo.md(
-            "`MOTH_API_KEY` is not set, so the cells that call the engine will fail. "
-            "Create a key on the Atlas **API keys** page, export it, and restart the kernel."), kind="warn"))
-    return AUTORUN, Image, REPO_RAW, as_float, blur, io, mo, np, os, png, requests, row
+    return Image, as_float, io, np, png, row
 
 
 @app.cell
-def _(Image, REPO_RAW, as_float, io, mo, np, os, requests):
+def _(Image, as_float, io, run_job, upload):
+    # cell: blur
+    # The only Blur-specific code: which engine, which input slots, how to decode its output.
+    ENGINE_ID = "blur-v1"
+
+    def blur(params, image, mask=None):
+        """Run one Blur job. Returns (float RGB array in [0, 1], seconds)."""
+        input_files = {"image": upload(image, "image.png")}
+        if mask is not None:
+            input_files["mask"] = upload(mask, "mask.png")
+        data, t = run_job(ENGINE_ID, params, input_files)
+        return as_float(Image.open(io.BytesIO(data))), t
+
+    return (blur,)
+
+
+@app.cell
+def _(Image, as_float, io, mo, np, os, requests):
     # cell: image
     # The sample ships next to this file; when the notebook is opened from a URL it is fetched from the repo.
+    REPO_RAW = "https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur"
     IMAGE = "cat.png"
     src = open(IMAGE, "rb").read() if os.path.exists(IMAGE) else requests.get(f"{REPO_RAW}/{IMAGE}", timeout=60).content
     img_in = Image.open(io.BytesIO(src))
@@ -118,7 +166,21 @@ def _(mo):
 
 
 @app.cell
-def _(AUTORUN, a_in, blur, downscale, mo, np, reach, row, run, size, src, strength, style):
+def _(
+    AUTORUN,
+    a_in,
+    blur,
+    downscale,
+    mo,
+    np,
+    reach,
+    row,
+    run,
+    size,
+    src,
+    strength,
+    style,
+):
     # cell: run
     PARAMS = {"strength": strength.value, "style": style.value, "reach": reach.value, "size": size.value, "downscale": downscale.value}
     mo.stop(not (run.value or AUTORUN), mo.md("Press **Run Blur** to submit a job with the parameters above."))
