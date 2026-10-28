@@ -88,24 +88,7 @@ def _():
         mo.output.replace(mo.callout(mo.md(
             "`MOTH_API_KEY` is not set, so the cells that call the engine will fail. "
             "Create a key on the Atlas **API keys** page, export it, and restart the kernel."), kind="warn"))
-    return AUTORUN, fetch, mo, os, requests, run_job, submit, upload, wait
-
-
-@app.cell
-def _(Image, as_float, io, run_job, upload):
-    # cell: blur
-    # The only Blur-specific code: which engine, which input slots, how to decode its output.
-    ENGINE_ID = "blur-v1"
-
-    def blur(params, image, mask=None):
-        """Run one Blur job. Returns (float RGB array in [0, 1], seconds)."""
-        input_files = {"image": upload(image, "image.png")}
-        if mask is not None:
-            input_files["mask"] = upload(mask, "mask.png")
-        data, t = run_job(ENGINE_ID, params, input_files)
-        return as_float(Image.open(io.BytesIO(data))), t
-
-    return (blur,)
+    return AUTORUN, mo, os, requests, run_job, upload
 
 
 @app.cell
@@ -133,6 +116,23 @@ def _(mo):
         return mo.hstack([panel(k, v, **kw) for k, v in panels.items()], justify="start", gap=1, wrap=True)
 
     return Image, as_float, io, np, png, row
+
+
+@app.cell
+def _(Image, as_float, io, run_job, upload):
+    # cell: blur
+    # The only Blur-specific code: which engine, which input slots, how to decode its output.
+    ENGINE_ID = "blur-v1"
+
+    def blur(params, image, mask=None):
+        """Run one Blur job. Returns (float RGB array in [0, 1], seconds)."""
+        input_files = {"image": upload(image, "image.png")}
+        if mask is not None:
+            input_files["mask"] = upload(mask, "mask.png")
+        data, t = run_job(ENGINE_ID, params, input_files)
+        return as_float(Image.open(io.BytesIO(data))), t
+
+    return (blur,)
 
 
 @app.cell
@@ -166,7 +166,21 @@ def _(mo):
 
 
 @app.cell
-def _(AUTORUN, a_in, blur, downscale, mo, np, reach, row, run, size, src, strength, style):
+def _(
+    AUTORUN,
+    a_in,
+    blur,
+    downscale,
+    mo,
+    np,
+    reach,
+    row,
+    run,
+    size,
+    src,
+    strength,
+    style,
+):
     # cell: run
     PARAMS = {"strength": strength.value, "style": style.value, "reach": reach.value, "size": size.value, "downscale": downscale.value}
     mo.stop(not (run.value or AUTORUN), mo.md("Press **Run Blur** to submit a job with the parameters above."))
