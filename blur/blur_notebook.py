@@ -92,15 +92,10 @@ def _():
 
 
 @app.cell
-def _(mo, run_job, upload):
-    # cell: blur helpers
-    import io
-
-    import numpy as np
-    from PIL import Image
-
+def _(Image, as_float, io, run_job, upload):
+    # cell: blur
+    # The only Blur-specific code: which engine, which input slots, how to decode its output.
     ENGINE_ID = "blur-v1"
-    REPO_RAW = "https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur"
 
     def blur(params, image, mask=None):
         """Run one Blur job. Returns (float RGB array in [0, 1], seconds)."""
@@ -109,6 +104,18 @@ def _(mo, run_job, upload):
             input_files["mask"] = upload(mask, "mask.png")
         data, t = run_job(ENGINE_ID, params, input_files)
         return as_float(Image.open(io.BytesIO(data))), t
+
+    return (blur,)
+
+
+@app.cell
+def _(mo):
+    # cell: image helpers
+    # Demo-only: convert between images and float arrays, and lay out labelled image grids.
+    import io
+
+    import numpy as np
+    from PIL import Image
 
     def as_float(img):
         return np.asarray(img.convert("RGB"), float) / 255.0
@@ -125,13 +132,14 @@ def _(mo, run_job, upload):
     def row(panels, **kw):
         return mo.hstack([panel(k, v, **kw) for k, v in panels.items()], justify="start", gap=1, wrap=True)
 
-    return Image, REPO_RAW, as_float, blur, io, np, png, row
+    return Image, as_float, io, np, png, row
 
 
 @app.cell
-def _(Image, REPO_RAW, as_float, io, mo, np, os, requests):
+def _(Image, as_float, io, mo, np, os, requests):
     # cell: image
     # The sample ships next to this file; when the notebook is opened from a URL it is fetched from the repo.
+    REPO_RAW = "https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur"
     IMAGE = "cat.png"
     src = open(IMAGE, "rb").read() if os.path.exists(IMAGE) else requests.get(f"{REPO_RAW}/{IMAGE}", timeout=60).content
     img_in = Image.open(io.BytesIO(src))
