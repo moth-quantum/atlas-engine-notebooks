@@ -1,3 +1,14 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "atlas-helpers @ git+https://github.com/moth-quantum/atlas-engine-notebooks@main#subdirectory=atlas_helpers",
+#     "marimo>=0.17",
+#     "numpy>=1.26",
+#     "pillow>=10",
+#     "requests>=2.31",
+# ]
+# ///
+
 import marimo
 
 __generated_with = "0.25.2"
@@ -7,88 +18,22 @@ app = marimo.App(width="medium", app_title="Blur")
 @app.cell
 def _():
     # cell: moth client
-    # Engine-agnostic: copy this cell into any engine notebook unchanged.
-    import hashlib
-    import mimetypes
+    # Engine-agnostic API helpers live in atlas_helpers (this repo), installed from the header above.
     import os
-    import time
 
     import marimo as mo
     import requests
+    from atlas_helpers import download, submit, upload, wait
+
+    AUTORUN = os.environ.get("MOTH_AUTORUN") == "1"  # headless exports: run every cell without pressing buttons
 
     # Credentials come from the environment only. Atlas injects MOTH_API_KEY into a forked
     # notebook; locally, export a key created on the Atlas "API keys" page.
-    API_BASE = os.environ.get("MOTH_API_BASE", "https://api.mothquantum.com").rstrip("/")
-    API_KEY = os.environ.get("MOTH_API_KEY", "")
-    AUTORUN = os.environ.get("MOTH_AUTORUN") == "1"  # headless exports: run every cell without pressing buttons
-
-    s = requests.Session()
-    s.headers.update({"User-Agent": "atlas-engine-notebooks", "Accept": "application/json"})
-    if API_KEY:
-        s.headers["Authorization"] = f"Bearer {API_KEY}"
-
-    def api(method, path, **kw):
-        r = s.request(method, f"{API_BASE}{path}", timeout=60, **kw)
-        if r.status_code >= 400:
-            raise RuntimeError(f"{method} {path} -> {r.status_code}: {r.text[:300]}")
-        return r
-
-    _uploaded = {}
-
-    def upload(data, name, content_type=None):
-        """Upload once per distinct file (create, PUT to the presigned URL, complete); returns its asset_id.
-        content_type defaults to a guess from the filename."""
-        content_type = content_type or mimetypes.guess_type(name)[0] or "application/octet-stream"
-        key = hashlib.sha256(data).hexdigest()
-        if key not in _uploaded:
-            created = api("POST", "/api/v1/assets", json={"filename": name, "content_type": content_type, "size_bytes": len(data)}).json()
-            up = created["upload"]
-            r = requests.request(up.get("method", "PUT"), up["url"], data=data, headers=up["headers"], timeout=60)  # presigned: no bearer header
-            if r.status_code >= 400:
-                raise RuntimeError(f"upload {created['asset_id']} -> {r.status_code}: {r.text[:300]}")
-            _uploaded[key] = api("POST", f"/api/v1/assets/{created['asset_id']}/complete").json()["asset_id"]
-        return _uploaded[key]
-
-    def submit(engine_id, params, input_files=None):
-        """Start a job; returns its job_id. input_files maps slot -> asset_id."""
-        body = {"params": params, **({"input_files": input_files} if input_files else {})}
-        return api("POST", f"/api/v1/engines/{engine_id}/process", json=body).json()["job_id"]
-
-    def wait(job_id, interval=1.5):
-        """Poll until the job completes; raises if it fails or is cancelled."""
-        while True:
-            job = api("GET", f"/api/v1/jobs/{job_id}/status").json()
-            if job["status"] == "completed":
-                return
-            if job["status"] in ("failed", "cancelled"):
-                raise RuntimeError(f"job {job_id} {job['status']}: {job.get('error')}")
-            time.sleep(interval)
-
-    def fetch(job_id, slot="result"):
-        """Bytes of the output in `slot` (or the first output), or the inline JSON result for engines
-        that produce no file."""
-        res = api("GET", f"/api/v1/jobs/{job_id}/result").json()
-        outputs = res.get("outputs") or []
-        out = next((o for o in outputs if o.get("slot") == slot), outputs[0] if outputs else None)
-        if out is None:
-            if res.get("result") is None:
-                raise RuntimeError(f"job {job_id} finished without an output")
-            return res["result"]
-        url = out.get("url") or api("GET", f"/api/v1/assets/{out['output_asset_id']}/download").json()["download_url"]
-        return requests.get(url, timeout=60).content  # presigned: sent without the bearer header
-
-    def run_job(engine_id, params, input_files=None, slot="result"):
-        """submit -> wait -> fetch. Returns (fetch's result, seconds)."""
-        t0 = time.perf_counter()
-        job_id = submit(engine_id, params, input_files)
-        wait(job_id)
-        return fetch(job_id, slot), time.perf_counter() - t0
-
-    if not API_KEY:
+    if not os.environ.get("MOTH_API_KEY"):
         mo.output.replace(mo.callout(mo.md(
             "`MOTH_API_KEY` is not set, so the cells that call the engine will fail. "
             "Create a key on the Atlas **API keys** page, export it, and restart the kernel."), kind="warn"))
-    return AUTORUN, mo, os, requests, run_job, upload
+    return AUTORUN, download, mo, os, requests, submit, upload, wait
 
 
 @app.cell
@@ -119,9 +64,11 @@ def _(mo):
 
 
 @app.cell
-def _(Image, as_float, io, run_job, upload):
+def _(Image, as_float, download, io, submit, upload, wait):
     # cell: blur
     # The only Blur-specific code: which engine, which input slots, how to decode its output.
+    import time
+
     ENGINE_ID = "blur-v1"
 
     def blur(params, image, mask=None):
@@ -129,8 +76,11 @@ def _(Image, as_float, io, run_job, upload):
         input_files = {"image": upload(image, "image.png")}
         if mask is not None:
             input_files["mask"] = upload(mask, "mask.png")
-        data, t = run_job(ENGINE_ID, params, input_files)
-        return as_float(Image.open(io.BytesIO(data))), t
+        t0 = time.perf_counter()
+        job_id = submit(ENGINE_ID, params, input_files)
+        wait(job_id)
+        data = download(job_id)
+        return as_float(Image.open(io.BytesIO(data))), time.perf_counter() - t0
 
     return (blur,)
 
