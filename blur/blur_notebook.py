@@ -14,7 +14,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium", app_title="Blur")
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     # cell: moth client
     # Engine-agnostic API helpers, copied from client.py in the repo root so this file runs on its own.
