@@ -134,17 +134,18 @@ def _():
     # Blur's own imports. The hidden setup cell already provides the API helpers and the modules they use
     # (os, time, requests, ...), so those are not imported again here.
     import io
+    import math
 
     import marimo as mo
     import numpy as np
     from PIL import Image
 
-    return Image, io, mo, np
+    return Image, io, math, mo, np
 
 
 @app.cell
 def _(Image, io, mo, np):
-    # cell: display
+    # cell: display helpers
     # Convert between images and float arrays, and lay out labelled image grids.
     def as_float(img):
         return np.asarray(img.convert("RGB"), float) / 255.0
@@ -183,25 +184,46 @@ def _(mo):
     mo.md(r"""
     ## Load an image
 
-    The sample image ships next to this notebook. Point `IMAGE` at your own file to blur that instead.
+    Drop your own image below, or leave it empty to use the sample cat that ships with this notebook.
     """)
     return
 
 
 @app.cell
-def _(Image, as_float, io, mo, np):
-    # cell: image
-    # The sample ships next to this file; if it is missing (notebook opened on its own) it is fetched from the repo.
-    REPO_RAW = "https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur"
-    IMAGE = "cat.png"
-    sample = mo.notebook_dir() / IMAGE
-    src = sample.read_bytes() if sample.exists() else requests.get(f"{REPO_RAW}/{IMAGE}", timeout=60).content
-    img_in = Image.open(io.BytesIO(src))
-    a_in = as_float(img_in)
-    W, H = img_in.size
-    qubits = int(np.ceil(np.log2(W))) + int(np.ceil(np.log2(H)))
-    mo.vstack([mo.image(src=src, width=256), mo.md(f"`{IMAGE}` · {W}×{H} {img_in.mode} → {qubits} qubits per channel")])
-    return H, W, a_in, src
+def _(mo):
+    # cell: image-input
+    image_upload = mo.ui.file(filetypes=["image/*"], kind="area", label="Drop an image here, or leave empty to use the sample cat")
+    image_upload
+    return (image_upload,)
+
+
+@app.cell
+def _(mo):
+    # cell: default image
+    # Uses the uploaded file if there is one, otherwise the sample next to this notebook (fetched from GitHub if missing).
+    SAMPLE = "cat.png"
+    SAMPLE_URL = f"https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur/{SAMPLE}"
+
+    def load_sample():
+        path = mo.notebook_dir() / SAMPLE
+        return path.read_bytes() if path.exists() else requests.get(SAMPLE_URL, timeout=60).content
+
+    return SAMPLE, load_sample
+
+
+@app.cell
+def _(Image, SAMPLE, as_float, image_upload, io, load_sample, math, mo):
+    # cell: load and preview
+    image_name = image_upload.name() or SAMPLE
+    image_bytes = image_upload.contents() or load_sample()
+    image = Image.open(io.BytesIO(image_bytes))
+    image_px = as_float(image)  # float RGB in [0, 1], what the engine's output is compared against
+    width, height = image.size
+
+    qubits = math.ceil(math.log2(width)) + math.ceil(math.log2(height))
+    mo.vstack([mo.image(image_bytes, width=256),
+               mo.md(f"`{image_name}` · {width}×{height} {image.mode} → {qubits} qubits per colour channel")])
+    return height, image_bytes, image_name, image_px, width
 
 
 @app.cell(hide_code=True)
@@ -220,9 +242,9 @@ def _(Image, as_float, io, mo):
     # cell: blur
     ENGINE_ID = "blur-v1"
 
-    def blur(params, image, mask=None):
-        """Run one Blur job. Returns (float RGB array in [0, 1], seconds)."""
-        input_files = {"image": upload(image, filename="image.png")}
+    def blur(params, image, filename, mask=None):
+        """Run one Blur job on image (bytes named filename). Returns (float RGB array in [0, 1], seconds)."""
+        input_files = {"image": upload(image, filename=filename)}
         if mask is not None:
             input_files["mask"] = upload(mask, filename="mask.png")
         t0 = time.perf_counter()
@@ -261,27 +283,28 @@ def _(mo):
 
 @app.cell
 def _(
-    a_in,
     blur,
     downscale,
+    image_bytes,
+    image_name,
+    image_px,
     mo,
     np,
     reach,
     row,
     run,
     size,
-    src,
     strength,
     style,
 ):
     # cell: run
     mo.stop(not (run.value or AUTORUN), mo.md("Press **Run Blur** to submit a job with the parameters above."))
     PARAMS = {"strength": strength.value, "style": style.value, "reach": reach.value, "size": size.value, "downscale": downscale.value}
-    a_out, t = blur(PARAMS, src)
-    diff = np.abs(a_out - a_in)
+    a_out, t = blur(PARAMS, image_bytes, image_name)
+    diff = np.abs(a_out - image_px)
     mo.vstack([
         mo.md(f"`{PARAMS}` · {t:.1f} s · mean |out − in| = {diff.mean():.3f}"),
-        row({"input": a_in, f"{PARAMS['style']} · strength {PARAMS['strength']} · reach {PARAMS['reach']}": a_out,
+        row({"input": image_px, f"{PARAMS['style']} · strength {PARAMS['strength']} · reach {PARAMS['reach']}": a_out,
              "|out − in|": diff.mean(-1) / max(diff.max(), 1e-6)}),
     ])
     return
@@ -334,11 +357,11 @@ def _(mo):
 
 
 @app.cell
-def _(a_in, blur, experiments, mo, np, row, src):
+def _(blur, experiments, image_bytes, image_name, image_px, mo, np, row):
     # cell: strength
     mo.stop(not (experiments.value or AUTORUN), mo.md("Press **Run experiments** above to run this cell (5 jobs)."))
-    outs = {k: blur({"style": "rx", "reach": 0.0, "strength": k}, src)[0] for k in (0.0, 0.25, 0.5, 0.75, 1.0)}
-    diffs = {k: round(float(np.abs(o - a_in).mean()), 3) for k, o in outs.items()}
+    outs = {k: blur({"style": "rx", "reach": 0.0, "strength": k}, image_bytes, image_name)[0] for k in (0.0, 0.25, 0.5, 0.75, 1.0)}
+    diffs = {k: round(float(np.abs(o - image_px).mean()), 3) for k, o in outs.items()}
     mo.vstack([mo.md("**rx · reach 0** — label shows mean |out − in|"), row({f"strength {k} · {diffs[k]}": o for k, o in outs.items()}, width=170)])
     return
 
@@ -355,17 +378,17 @@ def _(mo):
 
 
 @app.cell
-def _(a_in, blur, experiments, mo, row, src):
+def _(blur, experiments, image_bytes, image_name, image_px, mo, row):
     # cell: reach
     mo.stop(not (experiments.value or AUTORUN), mo.md("Press **Run experiments** above to run this cell (6 jobs)."))
     rows = []
     for st in ("rx", "ry"):
-        panels = {"input": a_in}
+        panels = {"input": image_px}
         for r in (0.0, 0.5, 1.0):
-            o = blur({"style": st, "reach": r, "strength": 0.5}, src)[0]
+            o = blur({"style": st, "reach": r, "strength": 0.5}, image_bytes, image_name)[0]
             panels[f"{st} · reach {r} · mean {o.mean():.2f}"] = o
         rows.append(row(panels, width=170))
-    mo.vstack([mo.md(f"**strength 0.5** · input mean brightness {a_in.mean():.2f}"), *rows])
+    mo.vstack([mo.md(f"**strength 0.5** · input mean brightness {image_px.mean():.2f}"), *rows])
     return
 
 
@@ -381,18 +404,30 @@ def _(mo):
 
 
 @app.cell
-def _(H, W, a_in, blur, experiments, mo, np, png, row, src):
+def _(
+    blur,
+    experiments,
+    height,
+    image_bytes,
+    image_name,
+    image_px,
+    mo,
+    np,
+    png,
+    row,
+    width,
+):
     # cell: mask
     mo.stop(not (experiments.value or AUTORUN), mo.md("Press **Run experiments** above to run this cell (1 job)."))
-    yy, xx = np.mgrid[0:H, 0:W]
-    soft = np.clip(1.6 - np.hypot(xx - W / 2, yy - H / 2) / (0.28 * min(W, H)), 0, 1)
-    a_m, t_mask = blur({"style": "rx", "reach": 0.0, "strength": 0.8}, src, mask=png(soft))
-    d = np.abs(a_m - a_in).mean(-1)
+    yy, xx = np.mgrid[0:height, 0:width]
+    soft = np.clip(1.6 - np.hypot(xx - width / 2, yy - height / 2) / (0.28 * min(width, height)), 0, 1)
+    a_m, t_mask = blur({"style": "rx", "reach": 0.0, "strength": 0.8}, image_bytes, image_name, mask=png(soft))
+    d = np.abs(a_m - image_px).mean(-1)
     outside = d[soft == 0].max()
     verdict = "outside the mask untouched ✓" if outside < 1 / 255 else "**outside the mask changed — the blend contract is broken**"
     mo.vstack([
         mo.md(f"{t_mask:.1f} s · max change outside mask {outside:.4f} · mean change inside {d[soft == 1].mean():.3f} · {verdict}"),
-        row({"input": a_in, "mask": soft, "rx · strength 0.8 · masked": a_m, "|out − in|": d / max(d.max(), 1e-6)}),
+        row({"input": image_px, "mask": soft, "rx · strength 0.8 · masked": a_m, "|out − in|": d / max(d.max(), 1e-6)}),
     ])
     return
 
