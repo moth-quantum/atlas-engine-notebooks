@@ -333,16 +333,15 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     # cell: experiments-md
-    experiments = mo.ui.run_button(label="Run experiments (12 jobs)")
-    mo.vstack([mo.md(r"""
+    mo.md(r"""
     ## Experiments
 
-    Each experiment sweeps one parameter with the others fixed, so you can see what it does on its own. Nothing is submitted until you press the button.
-    """), experiments])
-    return (experiments,)
+    Each experiment sweeps one parameter with the others fixed, so you can see what it does on its own. Each has its own run button, and nothing is submitted until you press it.
+    """)
+    return
 
 
 @app.cell(hide_code=True)
@@ -357,12 +356,43 @@ def _(mo):
 
 
 @app.cell
-def _(blur, experiments, image_bytes, image_name, image_px, mo, np, row):
+def _():
+    # cell: strength-params
+    # Edit these, then press the run button: one job per value in the sweep.
+    STRENGTH_SWEEP = (0.0, 0.25, 0.5, 0.75, 1.0)
+    STRENGTH_FIXED = {"style": "rx", "reach": 0.0}
+    return STRENGTH_FIXED, STRENGTH_SWEEP
+
+
+@app.cell(hide_code=True)
+def _(STRENGTH_SWEEP, mo):
+    # cell: strength-run
+    run_strength = mo.ui.run_button(label=f"Run strength sweep ({len(STRENGTH_SWEEP)} jobs)")
+    run_strength
+    return (run_strength,)
+
+
+@app.cell(hide_code=True)
+def _(
+    STRENGTH_FIXED,
+    STRENGTH_SWEEP,
+    blur,
+    image_bytes,
+    image_name,
+    image_px,
+    mo,
+    np,
+    row,
+    run_strength,
+):
     # cell: strength
-    mo.stop(not (experiments.value or AUTORUN), mo.md("Press **Run experiments** above to run this cell (5 jobs)."))
-    outs = {k: blur({"style": "rx", "reach": 0.0, "strength": k}, image_bytes, image_name)[0] for k in (0.0, 0.25, 0.5, 0.75, 1.0)}
+    mo.stop(not (run_strength.value or AUTORUN), mo.md(f"Press **Run strength sweep** to run this cell ({len(STRENGTH_SWEEP)} jobs)."))
+    outs = {k: blur({**STRENGTH_FIXED, "strength": k}, image_bytes, image_name)[0] for k in STRENGTH_SWEEP}
     diffs = {k: round(float(np.abs(o - image_px).mean()), 3) for k, o in outs.items()}
-    mo.vstack([mo.md("**rx · reach 0** — label shows mean |out − in|"), row({f"strength {k} · {diffs[k]}": o for k, o in outs.items()}, width=170)])
+    mo.vstack([
+        mo.md(f"**{STRENGTH_FIXED['style']} · reach {STRENGTH_FIXED['reach']}** — label shows mean |out − in|"),
+        row({f"strength {k} · {diffs[k]}": o for k, o in outs.items()}, width=170),
+    ])
     return
 
 
@@ -378,17 +408,46 @@ def _(mo):
 
 
 @app.cell
-def _(blur, experiments, image_bytes, image_name, image_px, mo, row):
+def _():
+    # cell: reach-params
+    # Edit these, then press the run button: one job per style × reach.
+    REACH_SWEEP = (0.0, 0.5, 1.0)
+    REACH_STYLES = ("rx", "ry")
+    REACH_FIXED = {"strength": 0.5}
+    return REACH_FIXED, REACH_STYLES, REACH_SWEEP
+
+
+@app.cell(hide_code=True)
+def _(REACH_STYLES, REACH_SWEEP, mo):
+    # cell: reach-run
+    run_reach = mo.ui.run_button(label=f"Run reach and style sweep ({len(REACH_STYLES) * len(REACH_SWEEP)} jobs)")
+    run_reach
+    return (run_reach,)
+
+
+@app.cell(hide_code=True)
+def _(
+    REACH_FIXED,
+    REACH_STYLES,
+    REACH_SWEEP,
+    blur,
+    image_bytes,
+    image_name,
+    image_px,
+    mo,
+    row,
+    run_reach,
+):
     # cell: reach
-    mo.stop(not (experiments.value or AUTORUN), mo.md("Press **Run experiments** above to run this cell (6 jobs)."))
+    mo.stop(not (run_reach.value or AUTORUN), mo.md(f"Press **Run reach and style sweep** to run this cell ({len(REACH_STYLES) * len(REACH_SWEEP)} jobs)."))
     rows = []
-    for st in ("rx", "ry"):
+    for st in REACH_STYLES:
         panels = {"input": image_px}
-        for r in (0.0, 0.5, 1.0):
-            o = blur({"style": st, "reach": r, "strength": 0.5}, image_bytes, image_name)[0]
+        for r in REACH_SWEEP:
+            o = blur({**REACH_FIXED, "style": st, "reach": r}, image_bytes, image_name)[0]
             panels[f"{st} · reach {r} · mean {o.mean():.2f}"] = o
         rows.append(row(panels, width=170))
-    mo.vstack([mo.md(f"**strength 0.5** · input mean brightness {image_px.mean():.2f}"), *rows])
+    mo.vstack([mo.md(f"**strength {REACH_FIXED['strength']}** · input mean brightness {image_px.mean():.2f}"), *rows])
     return
 
 
@@ -404,9 +463,29 @@ def _(mo):
 
 
 @app.cell
+def _():
+    # cell: mask-params
+    # Edit these, then press the run button (one job).
+    MASK_PARAMS = {"style": "rx", "reach": 0.0, "strength": 0.8}
+    MASK_RADIUS = 0.28  # disc scale, as a fraction of the image's shorter side
+    MASK_RAMP = 1.6  # mask = clip(MASK_RAMP - distance / radius, 0, 1): 1 inside, a soft edge, 0 outside
+    return MASK_PARAMS, MASK_RADIUS, MASK_RAMP
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    # cell: mask-run
+    run_mask = mo.ui.run_button(label="Run mask experiment (1 job)")
+    run_mask
+    return (run_mask,)
+
+
+@app.cell(hide_code=True)
 def _(
+    MASK_PARAMS,
+    MASK_RADIUS,
+    MASK_RAMP,
     blur,
-    experiments,
     height,
     image_bytes,
     image_name,
@@ -415,19 +494,25 @@ def _(
     np,
     png,
     row,
+    run_mask,
     width,
 ):
     # cell: mask
-    mo.stop(not (experiments.value or AUTORUN), mo.md("Press **Run experiments** above to run this cell (1 job)."))
+    mo.stop(not (run_mask.value or AUTORUN), mo.md("Press **Run mask experiment** to run this cell (1 job)."))
     yy, xx = np.mgrid[0:height, 0:width]
-    soft = np.clip(1.6 - np.hypot(xx - width / 2, yy - height / 2) / (0.28 * min(width, height)), 0, 1)
-    a_m, t_mask = blur({"style": "rx", "reach": 0.0, "strength": 0.8}, image_bytes, image_name, mask=png(soft))
+    soft = np.clip(MASK_RAMP - np.hypot(xx - width / 2, yy - height / 2) / (MASK_RADIUS * min(width, height)), 0, 1)
+    a_m, t_mask = blur(MASK_PARAMS, image_bytes, image_name, mask=png(soft))
     d = np.abs(a_m - image_px).mean(-1)
     outside = d[soft == 0].max()
     verdict = "outside the mask untouched ✓" if outside < 1 / 255 else "**outside the mask changed — the blend contract is broken**"
     mo.vstack([
         mo.md(f"{t_mask:.1f} s · max change outside mask {outside:.4f} · mean change inside {d[soft == 1].mean():.3f} · {verdict}"),
-        row({"input": image_px, "mask": soft, "rx · strength 0.8 · masked": a_m, "|out − in|": d / max(d.max(), 1e-6)}),
+        row({
+            "input": image_px,
+            "mask": soft,
+            f"{MASK_PARAMS['style']} · strength {MASK_PARAMS['strength']} · masked": a_m,
+            "|out − in|": d / max(d.max(), 1e-6),
+        }),
     ])
     return
 
