@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copy client.py into every engine notebook, and generate the helper reference shown there.
+"""Copy client.py into every engine notebook, and generate the helper note shown there.
 
     scripts/sync_client.py             # rewrite the generated blocks in each <engine>/<engine>_notebook.py
     scripts/sync_client.py --check     # exit 1 if any notebook is out of date (for CI)
@@ -7,10 +7,11 @@
 client.py is the source of truth. Each notebook holds two generated blocks, so it also runs on its own,
 where client.py is not available:
 
-  * `client.py`      in the hidden `moth client` cell: the code, minus its imports and `__all__`.
+  * `client.py`      in the hidden `setup` cell: the code, minus its imports and `__all__`.
                      Imports the notebook's `imports` cell already provides are the parameters of that
                      cell's `def _(...)`; the script drops them and keeps any other client-only import.
-  * `client api`     in the visible `client-api` cell: a table of the functions in client.py's `__all__`.
+  * `client api`     in the same cell: `_client_note`, a markdown line naming the functions in client.py's
+                     `__all__`. The cell shows it as its output.
 """
 
 import ast
@@ -49,24 +50,12 @@ def docs_block():
     tree = ast.parse((ROOT / "client.py").read_text())
     names = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and n.targets[0].id == "__all__")
     funcs = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
-    rows = []
-    for name in names:
-        fn = funcs[name]
-        doc = " ".join((ast.get_docstring(fn) or "").split("\n\n")[0].split()).replace("|", "\\|")
-        rows.append(f"    | `{name}({ast.unparse(fn.args)})` | {doc} |")
-    table = "\n".join(rows)
+    sigs = " · ".join(f"`{n}({ast.unparse(funcs[n].args)})`" for n in names)
     return f'''{DOCS[0]}
-    mo.md(r"""
-    ## Moth client
-
-    The helpers below are defined in the hidden `moth client` cell and can be used in any cell.
-
-    | function | what it does |
-    |---|---|
-{table}
-
-    Set `MOTH_API_KEY` (and optionally `MOTH_API_BASE`) in the environment.
-    """)
+    _client_note = mo.md(
+        "**Moth client** (defined in this hidden setup cell, usable in any cell): "
+        "{sigs}. Set `MOTH_API_KEY` (and optionally `MOTH_API_BASE`) in the environment."
+    )
 {DOCS[1]}'''
 
 
@@ -79,9 +68,9 @@ def replace(text, markers, new, path):
 
 def sync(path):
     text = path.read_text()
-    m = re.search(r"def _\(([^)]*)\):\n\s+# cell: moth client", text)
+    m = re.search(r"def _\(([^)]*)\):\n\s+# cell: setup", text)
     if not m:
-        sys.exit(f"{path.relative_to(ROOT)}: `# cell: moth client` cell not found")
+        sys.exit(f"{path.relative_to(ROOT)}: `# cell: setup` cell not found")
     provided = {p.strip() for p in m.group(1).split(",") if p.strip()}
     text = replace(text, CODE, code_block(provided), path)
     return replace(text, DOCS, docs_block(), path)
