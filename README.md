@@ -16,7 +16,7 @@ export MOTH_API_KEY=...          # from Atlas → API keys
 marimo edit blur/blur_notebook.py
 ```
 
-Each notebook carries its own copy of the shared helpers from [`client.py`](client.py), so it also runs on its own. If the sample image isn't next to the notebook it is fetched from this repo.
+Each notebook carries its own generated copy of the shared helpers from [`client.py`](client.py) in a hidden setup cell, so it also runs on its own. If the sample image isn't next to the notebook it is fetched from this repo.
 
 Press **Run Blur** to submit one job; tick **Also run the sweeps** to run the parameter sweeps (12 more jobs). Nothing is submitted until you press the button.
 
@@ -42,7 +42,7 @@ writes `blur/outputs/blur_notebook.ipynb` (code, markdown and outputs) and `blur
 
 - One folder per engine, named after the Atlas page slug: `<engine>/<engine>_notebook.py`, its sample inputs beside it, saved outputs under `<engine>/outputs/`.
 - Every `@app.cell` starts with a `# cell: <id>` comment. Atlas uses these ids to match cells to its viewer; keep them stable.
-- API calls go through [`client.py`](client.py) (`upload`, `submit`, `wait`, `download`), shared by every notebook; it needs only `requests`. `client.py` is the source of truth: each notebook holds a generated copy between the `# >>> client.py` / `# <<< client.py` markers in its `moth client` cell. After editing `client.py`, run `scripts/sync_client.py` to refresh the copies; `scripts/sync_client.py --check` exits 1 if any are stale (use it in CI). Don't edit the generated block by hand. It follows the Moth wire contract as Atlas uses it: `POST /api/v1/assets` (JSON `filename`/`content_type`/`size_bytes`) → `asset_id` + presigned `upload`, `PUT` the bytes there, then `POST /api/v1/assets/<id>/complete`; `POST /api/v1/engines/<id>/process` → `job_id`; poll `GET /api/v1/jobs/<id>/status`; `GET /api/v1/jobs/<id>/result` → `outputs[]` with `slot` and a presigned `url`.
+- API calls go through [`client.py`](client.py) (`upload`, `submit`, `wait`, `download`), shared by every notebook; it needs only `requests`. `client.py` is the source of truth: `scripts/sync_client.py` generates two identical cells in every notebook from it, the hidden `with app.setup` block (the client code plus `AUTORUN`, visible to every cell) and a `helpers` cell (a collapsed list of the helpers, plus a warning when `MOTH_API_KEY` is unset). A new notebook only needs an empty `with app.setup(hide_code=True):` block; the script fills it in and adds `helpers` after it. Since setup-cell names are global, notebook cells use `os`, `time`, `requests`, ... from it and must not import or define them again (`marimo check` catches clashes). After editing `client.py`, run `scripts/sync_client.py`; `scripts/sync_client.py --check` exits 1 if any notebook is stale (use it in CI). Don't edit the generated cells by hand. It follows the Moth wire contract as Atlas uses it: `POST /api/v1/assets` (JSON `filename`/`content_type`/`size_bytes`) → `asset_id` + presigned `upload`, `PUT` the bytes there, then `POST /api/v1/assets/<id>/complete`; `POST /api/v1/engines/<id>/process` → `job_id`; poll `GET /api/v1/jobs/<id>/status`; `GET /api/v1/jobs/<id>/result` → `outputs[]` with `slot` and a presigned `url`.
 - No credentials, no tokens, no private hostnames in any file. `marimo check <file>` must pass.
 
 ## License

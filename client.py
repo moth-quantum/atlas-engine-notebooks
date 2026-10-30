@@ -25,7 +25,7 @@ _session = requests.Session()
 _session.headers["User-Agent"] = "atlas-engine-notebooks"
 
 
-def call(method, path, **kw):
+def _call(method, path, **kw):
     # Env is read per call, so a key exported after import still takes effect.
     base = os.environ.get("MOTH_API_BASE", "https://api.mothquantum.com").rstrip("/")
     key = os.environ.get("MOTH_API_KEY", "")
@@ -48,9 +48,11 @@ def _presigned(method, url, **kw):
 _uploaded = {}  # (sha256, content_type) -> asset_id, so re-running a cell doesn't re-upload
 
 
-def upload(file, content_type=None, filename=None):
-    """Upload a path or bytes (create, PUT to the presigned URL, complete); returns its asset_id.
-    content_type defaults to a guess from the filename."""
+def upload(file: str | os.PathLike | bytes, content_type: str | None = None, filename: str | None = None) -> str:
+    """Upload a file path or raw bytes; returns its asset id.
+
+    content_type defaults to a guess from the filename; filename names uploaded bytes.
+    Runs the three API steps: create, PUT to the presigned URL, complete."""
     if isinstance(file, (bytes, bytearray)):
         data, filename = bytes(file), filename or "file"
     else:
@@ -58,24 +60,24 @@ def upload(file, content_type=None, filename=None):
     content_type = content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
     key = (hashlib.sha256(data).hexdigest(), content_type)
     if key not in _uploaded:
-        asset = call("POST", "/assets", json={"filename": filename, "content_type": content_type, "size_bytes": len(data)})
+        asset = _call("POST", "/assets", json={"filename": filename, "content_type": content_type, "size_bytes": len(data)})
         up = asset["upload"]
         _presigned(up.get("method", "PUT"), up["url"], data=data, headers=up["headers"])
-        _uploaded[key] = call("POST", f"/assets/{asset['asset_id']}/complete")["asset_id"]
+        _uploaded[key] = _call("POST", f"/assets/{asset['asset_id']}/complete")["asset_id"]
     return _uploaded[key]
 
 
-def submit(engine, params, input_files=None):
-    """Start a job; returns its job_id. input_files maps the engine's input slots to asset_ids."""
+def submit(engine: str, params: dict, input_files: dict[str, str] | None = None) -> str:
+    """Start a job on an engine; returns its job id. params is a dict of the engine's parameters; input_files is a dict mapping each input slot name to an asset id."""
     body = {"params": params, **({"input_files": input_files} if input_files else {})}
-    return call("POST", f"/engines/{engine}/process", json=body)["job_id"]
+    return _call("POST", f"/engines/{engine}/process", json=body)["job_id"]
 
 
-def wait(job_id, interval=1.5, timeout=600):
-    """Poll until the job completes; raises if it fails, is cancelled, or outlives timeout seconds."""
+def wait(job_id: str, interval: float = 1.5, timeout: float = 600) -> None:
+    """Block until the job completes, checking every interval seconds; raises if it fails, is cancelled, or takes longer than timeout seconds."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        job = call("GET", f"/jobs/{job_id}/status")
+        job = _call("GET", f"/jobs/{job_id}/status")
         if job["status"] == "completed":
             return
         if job["status"] in ("failed", "cancelled"):
@@ -84,15 +86,15 @@ def wait(job_id, interval=1.5, timeout=600):
     raise TimeoutError(f"Job {job_id} did not finish in {timeout}s")
 
 
-def download(job_id, slot="result"):
-    """Bytes of the output in `slot` (or the first output), or the inline JSON result for engines
-    that produce no file."""
-    res = call("GET", f"/jobs/{job_id}/result")
+def download(job_id: str, slot: str = "result") -> bytes | dict:
+    """Return a finished job's output: the bytes of the file in slot (or the first output), or the inline JSON result (a dict) for engines that produce no file."""
+    res = _call("GET", f"/jobs/{job_id}/result")
     outputs = res.get("outputs") or []
     out = next((o for o in outputs if o.get("slot") == slot), outputs[0] if outputs else None)
     if out is None:
         if res.get("result") is None:
             raise RuntimeError(f"Job {job_id} finished without an output")
         return res["result"]
-    url = out.get("url") or call("GET", f"/assets/{out['output_asset_id']}/download")["download_url"]
+    url = out.get("url") or _call("GET", f"/assets/{out['output_asset_id']}/download")["download_url"]
     return _presigned("GET", url).content
+
