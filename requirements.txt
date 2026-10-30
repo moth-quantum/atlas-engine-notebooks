@@ -3,4 +3,3 @@ nbformat>=5.10
 numpy>=1.26
 pillow>=10
 requests>=2.31
--e ./atlas_helpers

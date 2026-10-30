@@ -1,7 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "atlas-helpers @ git+https://github.com/moth-quantum/atlas-engine-notebooks@main#subdirectory=atlas_helpers",
 #     "marimo>=0.17",
 #     "numpy>=1.26",
 #     "pillow>=10",
@@ -18,22 +17,28 @@ app = marimo.App(width="medium", app_title="Blur")
 @app.cell
 def _():
     # cell: moth client
-    # Engine-agnostic API helpers live in atlas_helpers (this repo), installed from the header above.
+    # Engine-agnostic API helpers live in client.py at the repo root, one folder above this notebook.
     import os
+    import sys
+    from pathlib import Path
 
     import marimo as mo
     import requests
-    from atlas_helpers import download, submit, upload, wait
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    try:
+        from client import download, submit, upload, wait
+    except ImportError as e:
+        raise ImportError("client.py not found: open this notebook from a clone of atlas-engine-notebooks") from e
 
     AUTORUN = os.environ.get("MOTH_AUTORUN") == "1"  # headless exports: run every cell without pressing buttons
 
-    # Credentials come from the environment only. Atlas injects MOTH_API_KEY into a forked
-    # notebook; locally, export a key created on the Atlas "API keys" page.
+    # Credentials come from the environment only: export a key created on the Atlas "API keys" page.
     if not os.environ.get("MOTH_API_KEY"):
         mo.output.replace(mo.callout(mo.md(
             "`MOTH_API_KEY` is not set, so the cells that call the engine will fail. "
             "Create a key on the Atlas **API keys** page, export it, and restart the kernel."), kind="warn"))
-    return AUTORUN, download, mo, os, requests, submit, upload, wait
+    return AUTORUN, Path, download, mo, requests, submit, upload, wait
 
 
 @app.cell
@@ -73,9 +78,9 @@ def _(Image, as_float, download, io, submit, upload, wait):
 
     def blur(params, image, mask=None):
         """Run one Blur job. Returns (float RGB array in [0, 1], seconds)."""
-        input_files = {"image": upload(image, "image.png")}
+        input_files = {"image": upload(image, filename="image.png")}
         if mask is not None:
-            input_files["mask"] = upload(mask, "mask.png")
+            input_files["mask"] = upload(mask, filename="mask.png")
         t0 = time.perf_counter()
         job_id = submit(ENGINE_ID, params, input_files)
         wait(job_id)
@@ -86,12 +91,13 @@ def _(Image, as_float, download, io, submit, upload, wait):
 
 
 @app.cell
-def _(Image, as_float, io, mo, np, os, requests):
+def _(Image, Path, as_float, io, mo, np, requests):
     # cell: image
-    # The sample ships next to this file; when the notebook is opened from a URL it is fetched from the repo.
+    # The sample ships next to this file; if it is missing (notebook opened on its own) it is fetched from the repo.
     REPO_RAW = "https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur"
     IMAGE = "cat.png"
-    src = open(IMAGE, "rb").read() if os.path.exists(IMAGE) else requests.get(f"{REPO_RAW}/{IMAGE}", timeout=60).content
+    sample = Path(__file__).resolve().parent / IMAGE
+    src = sample.read_bytes() if sample.exists() else requests.get(f"{REPO_RAW}/{IMAGE}", timeout=60).content
     img_in = Image.open(io.BytesIO(src))
     a_in = as_float(img_in)
     W, H = img_in.size
