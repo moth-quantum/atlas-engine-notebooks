@@ -16,15 +16,15 @@ export MOTH_API_KEY=...          # from Atlas → API keys
 marimo edit blur/blur_notebook.py
 ```
 
-Or open it straight from GitHub without cloning:
+Each notebook carries its own generated copy of the shared helpers from [`client.py`](client.py) in a hidden setup cell, so it also runs on its own. If the sample image isn't next to the notebook it is fetched from this repo.
+
+Or open it straight from GitHub without cloning. `--sandbox` installs the dependencies listed in the notebook's header into an isolated environment:
 
 ```bash
-marimo edit https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur/blur_notebook.py
+marimo edit --sandbox https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur/blur_notebook.py
 ```
 
-The sample image is fetched from this repo when the notebook isn't run from a checkout.
-
-Press **Run Blur** to submit one job; tick **Also run the sweeps** to run the parameter sweeps (12 more jobs). Nothing is submitted until you press the button.
+Press **Run Blur** to submit one job. Each experiment (strength, reach and style, mask) has its own run button, and its sweep values are plain constants in the cell above it. Nothing is submitted until you press a button.
 
 ## Headless run (what Atlas's export does)
 
@@ -48,6 +48,7 @@ writes `blur/outputs/blur_notebook.ipynb` (code, markdown and outputs) and `blur
 
 - One folder per engine, named after the Atlas page slug: `<engine>/<engine>_notebook.py`, its sample inputs beside it, saved outputs under `<engine>/outputs/`.
 - Every `@app.cell` starts with a `# cell: <id>` comment. Atlas uses these ids to match cells to its viewer; keep them stable.
+- Shared helpers: [`client.py`](client.py) (`upload`, `submit`, `wait`, `download`; needs only `requests`) is the source of truth. `scripts/sync_client.py` copies it into each notebook's hidden `with app.setup` cell (plus `AUTORUN`) and adds a `helpers` cell listing them; `--check` exits 1 if a notebook is stale. Don't edit those cells by hand, and since setup names are global, don't re-import `os`, `time`, `requests`, ... in other cells. Start a new notebook from [`templates/engine_notebook.py`](templates/engine_notebook.py).
 - The API client in each notebook follows the Moth wire contract as Atlas uses it: `POST /api/v1/assets` (JSON `filename`/`content_type`/`size_bytes`) → `asset_id` + presigned `upload`, `PUT` the bytes there, then `POST /api/v1/assets/<id>/complete`; `POST /api/v1/engines/<id>/process` → `job_id`; poll `GET /api/v1/jobs/<id>/status`; `GET /api/v1/jobs/<id>/result` → `outputs[]` with `slot` and a presigned `url`.
 - No credentials, no tokens, no private hostnames in any file. `marimo check <file>` must pass.
 
