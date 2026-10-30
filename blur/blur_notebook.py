@@ -271,40 +271,29 @@ def _(mo):
 @app.cell
 def _(mo):
     # cell: params
-    strength = mo.ui.slider(0, 1, step=0.05, value=0.5, label="Strength")  # 0..1 rotation scale; 0 = identity
-    style = mo.ui.radio(options={"RX · spread": "rx", "RY · edges": "ry"}, value="RX · spread", label="Gate style")
-    reach = mo.ui.slider(0, 1, step=0.05, value=0.0, label="Reach")  # 0 = local angles, 1 = every qubit turns equally
-    size = mo.ui.slider(8, 1024, step=8, value=1024, label="Size")  # pixel budget per pass -> 2*ceil(log2 size) qubits
-    downscale = mo.ui.checkbox(value=True, label="Downscale large regions")  # over budget: shrink (on) or tile (off)
+    # Keys are the engine's parameter names, so params.value is the dict sent to the API.
+    params = mo.ui.dictionary({
+        "strength": mo.ui.slider(0, 1, step=0.05, value=0.5, label="Strength"),  # 0..1 rotation scale; 0 = identity
+        "style": mo.ui.radio(options={"RX · spread": "rx", "RY · edges": "ry"}, value="RX · spread", label="Gate style"),
+        "reach": mo.ui.slider(0, 1, step=0.05, value=0.0, label="Reach"),  # 0 = local angles, 1 = every qubit turns equally
+        "size": mo.ui.slider(8, 1024, step=8, value=1024, label="Size"),  # pixel budget per pass -> 2*ceil(log2 size) qubits
+        "downscale": mo.ui.checkbox(value=True, label="Downscale large regions"),  # over budget: shrink (on) or tile (off)
+    })
     run = mo.ui.run_button(label="Run Blur")
-    mo.vstack([strength, style, reach, size, downscale, run])
-    return downscale, reach, run, size, strength, style
+    mo.vstack([params.vstack(), run])
+    return params, run
 
 
 @app.cell
-def _(
-    blur,
-    downscale,
-    image_bytes,
-    image_name,
-    image_px,
-    mo,
-    np,
-    reach,
-    row,
-    run,
-    size,
-    strength,
-    style,
-):
+def _(blur, image_bytes, image_name, image_px, mo, np, params, row, run):
     # cell: run
     mo.stop(not (run.value or AUTORUN), mo.md("Press **Run Blur** to submit a job with the parameters above."))
-    PARAMS = {"strength": strength.value, "style": style.value, "reach": reach.value, "size": size.value, "downscale": downscale.value}
-    a_out, t = blur(PARAMS, image_bytes, image_name)
+    job_params = params.value
+    a_out, t = blur(job_params, image_bytes, image_name)
     diff = np.abs(a_out - image_px)
     mo.vstack([
-        mo.md(f"`{PARAMS}` · {t:.1f} s · mean |out − in| = {diff.mean():.3f}"),
-        row({"input": image_px, f"{PARAMS['style']} · strength {PARAMS['strength']} · reach {PARAMS['reach']}": a_out,
+        mo.md(f"`{job_params}` · {t:.1f} s · mean |out − in| = {diff.mean():.3f}"),
+        row({"input": image_px, f"{job_params['style']} · strength {job_params['strength']} · reach {job_params['reach']}": a_out,
              "|out − in|": diff.mean(-1) / max(diff.max(), 1e-6)}),
     ])
     return
