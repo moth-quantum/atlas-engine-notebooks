@@ -20,16 +20,19 @@ def _():
     # Engine-agnostic API helpers live in client.py at the repo root, one folder above this notebook.
     import os
     import sys
-    from pathlib import Path
 
     import marimo as mo
     import requests
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    _root = str(mo.notebook_dir().parent)  # client.py sits one folder above <engine>/<engine>_notebook.py
+    if _root not in sys.path:  # cells re-run; don't stack duplicates
+        sys.path.insert(0, _root)
     try:
         from client import download, submit, upload, wait
-    except ImportError as e:
-        raise ImportError("client.py not found: open this notebook from a clone of atlas-engine-notebooks") from e
+    except ModuleNotFoundError as e:
+        if e.name != "client":  # e.g. requests missing inside client.py: surface the real error
+            raise
+        raise ModuleNotFoundError("client.py not found: open this notebook from a clone of atlas-engine-notebooks") from e
 
     AUTORUN = os.environ.get("MOTH_AUTORUN") == "1"  # headless exports: run every cell without pressing buttons
 
@@ -38,7 +41,7 @@ def _():
         mo.output.replace(mo.callout(mo.md(
             "`MOTH_API_KEY` is not set, so the cells that call the engine will fail. "
             "Create a key on the Atlas **API keys** page, export it, and restart the kernel."), kind="warn"))
-    return AUTORUN, Path, download, mo, requests, submit, upload, wait
+    return AUTORUN, download, mo, requests, submit, upload, wait
 
 
 @app.cell
@@ -91,12 +94,12 @@ def _(Image, as_float, download, io, submit, upload, wait):
 
 
 @app.cell
-def _(Image, Path, as_float, io, mo, np, requests):
+def _(Image, as_float, io, mo, np, requests):
     # cell: image
     # The sample ships next to this file; if it is missing (notebook opened on its own) it is fetched from the repo.
     REPO_RAW = "https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur"
     IMAGE = "cat.png"
-    sample = Path(__file__).resolve().parent / IMAGE
+    sample = mo.notebook_dir() / IMAGE
     src = sample.read_bytes() if sample.exists() else requests.get(f"{REPO_RAW}/{IMAGE}", timeout=60).content
     img_in = Image.open(io.BytesIO(src))
     a_in = as_float(img_in)
