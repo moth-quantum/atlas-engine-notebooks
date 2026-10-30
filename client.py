@@ -73,11 +73,17 @@ def submit(engine: str, params: dict, input_files: dict[str, str] | None = None)
     return _call("POST", f"/engines/{engine}/process", json=body)["job_id"]
 
 
-def wait(job_id: str, interval: float = 1.5, timeout: float = 600) -> None:
-    """Block until the job completes, checking every interval seconds; raises if it fails, is cancelled, or takes longer than timeout seconds."""
-    deadline = time.monotonic() + timeout
+def wait(job_id: str, interval: float = 1.5, timeout: float = 600, on_update=None) -> None:
+    """Block until the job completes, checking every interval seconds; raises if it fails, is cancelled, or takes longer than timeout seconds.
+
+    on_update(job) is called whenever the status changes, with the status response as a dict,
+    e.g. on_update=lambda job: print(job["status"])."""
+    deadline, last = time.monotonic() + timeout, None
     while time.monotonic() < deadline:
         job = _call("GET", f"/jobs/{job_id}/status")
+        if on_update and job["status"] != last:
+            on_update(job)
+            last = job["status"]
         if job["status"] == "completed":
             return
         if job["status"] in ("failed", "cancelled"):
