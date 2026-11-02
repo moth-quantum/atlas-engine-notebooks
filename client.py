@@ -11,24 +11,26 @@ Credentials come from the environment only: export MOTH_API_KEY, a key created o
 "API keys" page. MOTH_API_BASE points at staging or a mock.
 """
 
-import hashlib
-import mimetypes
-import os
-import time
-from pathlib import Path
+# Imported under private names so a notebook's setup cell exposes only the public helpers (and the module
+# names stay free for the notebook's own imports, as they would be with `from moth_atlas import ...`).
+import hashlib as _hashlib
+import mimetypes as _mimetypes
+import os as _os
+import time as _time
+from pathlib import Path as _Path
 
-import requests
+import requests as _requests
 
 __all__ = ["upload", "submit", "wait", "download"]
 
-_session = requests.Session()
+_session = _requests.Session()
 _session.headers["User-Agent"] = "atlas-engine-notebooks"
 
 
 def _call(method, path, **kw):
     # Env is read per call, so a key exported after import still takes effect.
-    base = os.environ.get("MOTH_API_BASE", "https://api.mothquantum.com").rstrip("/")
-    key = os.environ.get("MOTH_API_KEY", "")
+    base = _os.environ.get("MOTH_API_BASE", "https://api.mothquantum.com").rstrip("/")
+    key = _os.environ.get("MOTH_API_KEY", "")
     if not key:
         raise RuntimeError("MOTH_API_KEY is not set: create a key on the Atlas API keys page and export it")
     r = _session.request(method, f"{base}/api/v1{path}", headers={"Authorization": f"Bearer {key}"}, timeout=30, **kw)
@@ -39,7 +41,7 @@ def _call(method, path, **kw):
 
 def _presigned(method, url, **kw):
     # Presigned URLs carry their own signature: never send the API key to them (plain requests, not _session).
-    r = requests.request(method, url, timeout=60, **kw)
+    r = _requests.request(method, url, timeout=60, **kw)
     if r.status_code >= 400:
         raise RuntimeError(f"{method} presigned URL -> {r.status_code}: {r.text[:300]}")
     return r
@@ -48,7 +50,7 @@ def _presigned(method, url, **kw):
 _uploaded = {}  # (sha256, content_type) -> asset_id, so re-running a cell doesn't re-upload
 
 
-def upload(file: str | os.PathLike | bytes, content_type: str | None = None, filename: str | None = None) -> str:
+def upload(file: str | _os.PathLike | bytes, content_type: str | None = None, filename: str | None = None) -> str:
     """Upload a file path or raw bytes; returns its asset id.
 
     content_type defaults to a guess from the filename; filename names uploaded bytes.
@@ -56,9 +58,9 @@ def upload(file: str | os.PathLike | bytes, content_type: str | None = None, fil
     if isinstance(file, (bytes, bytearray)):
         data, filename = bytes(file), filename or "file"
     else:
-        data, filename = Path(file).read_bytes(), filename or Path(file).name
-    content_type = content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    key = (hashlib.sha256(data).hexdigest(), content_type)
+        data, filename = _Path(file).read_bytes(), filename or _Path(file).name
+    content_type = content_type or _mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    key = (_hashlib.sha256(data).hexdigest(), content_type)
     if key not in _uploaded:
         asset = _call("POST", "/assets", json={"filename": filename, "content_type": content_type, "size_bytes": len(data)})
         up = asset["upload"]
@@ -78,8 +80,8 @@ def wait(job_id: str, interval: float = 1.5, timeout: float = 600, on_update=Non
 
     on_update(job) is called whenever the status changes, with the status response as a dict,
     e.g. on_update=lambda job: print(job["status"])."""
-    deadline, last = time.monotonic() + timeout, None
-    while time.monotonic() < deadline:
+    deadline, last = _time.monotonic() + timeout, None
+    while _time.monotonic() < deadline:
         job = _call("GET", f"/jobs/{job_id}/status")
         if on_update and job["status"] != last:
             on_update(job)
@@ -88,7 +90,7 @@ def wait(job_id: str, interval: float = 1.5, timeout: float = 600, on_update=Non
             return
         if job["status"] in ("failed", "cancelled"):
             raise RuntimeError(f"Job {job_id} {job['status']}: {job.get('error')}")
-        time.sleep(interval)
+        _time.sleep(interval)
     raise TimeoutError(f"Job {job_id} did not finish in {timeout}s")
 
 
