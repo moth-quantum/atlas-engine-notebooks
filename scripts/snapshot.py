@@ -19,5 +19,7 @@ for cell in nb["cells"]:
     for out in cell.get("outputs", []):
         if "image/png" in out.get("data", {}):
             out["data"].pop("text/html", None)
+banner = f"> **Generated** from [`{engine}_notebook.py`](../{engine}_notebook.py) by `scripts/snapshot.py`: don't edit this file."
+nb["cells"].insert(0, {"cell_type": "markdown", "id": "generated-banner", "metadata": {}, "source": banner})
 dst.write_text(json.dumps(nb, indent=1, ensure_ascii=False) + "\n")
 print(f"wrote {dst.relative_to(root.parent)}")
