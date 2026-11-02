@@ -130,7 +130,27 @@ def _():
     return Image, io, math, mo, np, requests
 
 
-@app.cell
+@app.cell(hide_code=True)
+def _(mo):
+    # cell: intro
+    mo.md(r"""
+    Quantum Blur turns an image into a single quantum state, rotates every qubit once, and measures the state back into pixels. One gate moves amplitude between pixels that can be far apart, so instead of soft focus you get echoes and interference that no convolution kernel produces.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    # cell: try-md
+    mo.md(r"""
+    ## Try it
+
+    Drop an image (or leave it empty to use the sample cat), pick the parameters, then press **Run Blur**.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
 def _(Image, io, mo, np):
     # cell: display-helpers
     # Convert between images and float arrays, and lay out labelled image grids.
@@ -152,34 +172,14 @@ def _(Image, io, mo, np):
     return as_float, png, row
 
 
-@app.cell(hide_code=True)
-def _(mo):
-    # cell: intro
-    mo.md(r"""
-    Quantum Blur turns an image into a single quantum state, rotates every qubit once, and measures the state back into pixels. One gate moves amplitude between pixels that can be far apart, so instead of soft focus you get echoes and interference that no convolution kernel produces.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    # cell: try-md
-    mo.md(r"""
-    ## Try it
-
-    Drop an image (or leave it empty to use the sample cat), pick the parameters, then press **Run Blur**.
-    """)
-    return
-
-
 @app.cell
 def _(Image, as_float, io):
     # cell: blur
-    # upload, submit, wait and download are the Moth API helpers from client.py, inlined in the hidden block at the top.
+    # upload, submit, wait and download: the Moth API helpers, from the hidden block at the top.
     ENGINE_ID = "blur-v1"
 
     def blur(params, image, filename, mask=None):
-        """Run one Blur job: upload the image (and mask), submit, wait, download. Returns a float RGB array in [0, 1]."""
+        """Run one Blur job (upload, submit, wait, download). Returns a float RGB array in [0, 1]."""
         input_files = {"image": upload(image, filename=filename)}
         if mask is not None:
             input_files["mask"] = upload(mask, filename="mask.png")
@@ -193,37 +193,34 @@ def _(Image, as_float, io):
 @app.cell
 def _(mo):
     # cell: image-input
-    image_upload = mo.ui.file(filetypes=["image/*"], kind="area", label="Drop an image here, or leave empty to use the sample cat")
+    image_upload = mo.ui.file(
+        filetypes=["image/*"], kind="area", label="Drop an image here, or leave empty to use the sample cat"
+    )
     image_upload
     return (image_upload,)
 
 
 @app.cell
-def _(mo, requests):
-    # cell: default-image
-    # Uses the uploaded file if there is one, otherwise the sample next to this notebook (fetched from GitHub if missing).
-    SAMPLE = "cat.png"
-    SAMPLE_URL = f"https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur/{SAMPLE}"
-
-    def load_sample():
-        path = mo.notebook_dir() / SAMPLE
-        return path.read_bytes() if path.exists() else requests.get(SAMPLE_URL, timeout=60).content
-
-    return SAMPLE, load_sample
-
-
-@app.cell
-def _(Image, SAMPLE, as_float, image_upload, io, load_sample, math, mo):
+def _(Image, as_float, image_upload, io, math, mo, requests):
     # cell: image
-    image_name = image_upload.name() or SAMPLE
-    image_bytes = image_upload.contents() or load_sample()
+    # The uploaded image, or else the sample cat beside this notebook (fetched from GitHub if missing).
+    SAMPLE = mo.notebook_dir() / "cat.png"
+    SAMPLE_URL = "https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur/cat.png"
+
+    if image_upload.contents():
+        image_name, image_bytes = image_upload.name(), image_upload.contents()
+    else:
+        image_name = SAMPLE.name
+        image_bytes = SAMPLE.read_bytes() if SAMPLE.exists() else requests.get(SAMPLE_URL, timeout=60).content
+
     image = Image.open(io.BytesIO(image_bytes))
     image_px = as_float(image)  # float RGB in [0, 1], what the engine's output is compared against
     width, height = image.size
-
     qubits = math.ceil(math.log2(width)) + math.ceil(math.log2(height))
-    mo.vstack([mo.image(image_bytes, width=256),
-               mo.md(f"`{image_name}` · {width}×{height} {image.mode} → {qubits} qubits per colour channel")])
+    mo.vstack([
+        mo.image(image_bytes, width=256),
+        mo.md(f"`{image_name}` · {width}×{height} {image.mode} → {qubits} qubits per colour channel"),
+    ])
     return height, image_bytes, image_name, image_px, width
 
 
@@ -258,13 +255,22 @@ def _(
 ):
     # cell: run
     mo.stop(not (run.value or AUTORUN), mo.md("Press **Run Blur** to blur the image with these settings."))
-    PARAMS = {"strength": strength.value, "style": style.value, "reach": reach.value, "size": size.value, "downscale": downscale.value}
-    a_out = blur(PARAMS, image_bytes, image_name)
-    diff = np.abs(a_out - image_px)
+    params = {
+        "strength": strength.value,
+        "style": style.value,
+        "reach": reach.value,
+        "size": size.value,
+        "downscale": downscale.value,
+    }
+    blurred = blur(params, image_bytes, image_name)
+    change = np.abs(blurred - image_px)
     mo.vstack([
-        mo.md(f"`{PARAMS}` · mean |out − in| = {diff.mean():.3f}"),
-        row({"input": image_px, f"{PARAMS['style']} · strength {PARAMS['strength']} · reach {PARAMS['reach']}": a_out,
-             "|out − in|": diff.mean(-1) / max(diff.max(), 1e-6)}),
+        mo.md(f"`{params}` · mean |out − in| = {change.mean():.3f}"),
+        row({
+            "input": image_px,
+            f"{params['style']} · strength {params['strength']} · reach {params['reach']}": blurred,
+            "|out − in|, brighter = changed more": change.mean(-1) / max(change.max(), 1e-6),
+        }),
     ])
     return
 
@@ -320,7 +326,14 @@ def _(mo):
     ## Experiments
 
     Each experiment changes one parameter and keeps the others fixed. Press its button to run it.
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    # cell: strength-md
+    mo.md(r"""
     ### Strength
 
     $\xi$ scales every angle. At 0 the round trip is exact; the echoes grow with it up to the limit of 1 (past that the rotations would start to undo themselves, which is why the engine stops there).
@@ -353,12 +366,21 @@ def _(
     run_strength,
 ):
     # cell: strength
-    mo.stop(not (run_strength.value or AUTORUN), mo.md("Press **Run strength sweep** to compare the strengths above."))
-    outs = {k: blur({**STRENGTH_FIXED, "strength": k}, image_bytes, image_name) for k in STRENGTH_SWEEP}
-    diffs = {k: round(float(np.abs(o - image_px).mean()), 3) for k, o in outs.items()}
+    mo.stop(
+        not (run_strength.value or AUTORUN),
+        mo.md("Press **Run strength sweep** to compare the strengths above."),
+    )
+    results = {
+        value: blur({**STRENGTH_FIXED, "strength": value}, image_bytes, image_name)
+        for value in STRENGTH_SWEEP
+    }
+    changes = {value: np.abs(out - image_px).mean() for value, out in results.items()}
     mo.vstack([
-        mo.md(f"**{STRENGTH_FIXED['style']} · reach {STRENGTH_FIXED['reach']}** — label shows mean |out − in|"),
-        row({f"strength {k} · {diffs[k]}": o for k, o in outs.items()}, width=170),
+        mo.md(
+            f"**{STRENGTH_FIXED['style']} · reach {STRENGTH_FIXED['reach']}** · "
+            "each label shows the mean change |out − in|"
+        ),
+        row({f"strength {value} · {changes[value]:.3f}": out for value, out in results.items()}, width=170),
     ])
     return
 
@@ -400,15 +422,21 @@ def _(
     run_reach,
 ):
     # cell: reach
-    mo.stop(not (run_reach.value or AUTORUN), mo.md("Press **Run reach and style sweep** to compare both gate styles across reach."))
+    mo.stop(
+        not (run_reach.value or AUTORUN),
+        mo.md("Press **Run reach and style sweep** to compare both gate styles across reach."),
+    )
     rows = []
-    for st in REACH_STYLES:
+    for gate in REACH_STYLES:
         panels = {"input": image_px}
-        for r in REACH_SWEEP:
-            o = blur({**REACH_FIXED, "style": st, "reach": r}, image_bytes, image_name)
-            panels[f"{st} · reach {r} · mean {o.mean():.2f}"] = o
+        for amount in REACH_SWEEP:
+            out = blur({**REACH_FIXED, "style": gate, "reach": amount}, image_bytes, image_name)
+            panels[f"{gate} · reach {amount} · mean {out.mean():.2f}"] = out
         rows.append(row(panels, width=170))
-    mo.vstack([mo.md(f"**strength {REACH_FIXED['strength']}** · input mean brightness {image_px.mean():.2f}"), *rows])
+    mo.vstack([
+        mo.md(f"**strength {REACH_FIXED['strength']}** · input mean brightness {image_px.mean():.2f}"),
+        *rows,
+    ])
     return
 
 
@@ -453,20 +481,25 @@ def _(
     width,
 ):
     # cell: mask
-    mo.stop(not (run_mask.value or AUTORUN), mo.md("Press **Run mask experiment** to blur only inside the disc."))
+    mo.stop(
+        not (run_mask.value or AUTORUN),
+        mo.md("Press **Run mask experiment** to blur only inside the disc."),
+    )
     yy, xx = np.mgrid[0:height, 0:width]
-    soft = np.clip(MASK_RAMP - np.hypot(xx - width / 2, yy - height / 2) / (MASK_RADIUS * min(width, height)), 0, 1)
-    a_m = blur(MASK_PARAMS, image_bytes, image_name, mask=png(soft))
-    d = np.abs(a_m - image_px).mean(-1)
-    outside = d[soft == 0].max()
-    verdict = "outside the mask untouched ✓" if outside < 1 / 255 else "**pixels outside the mask changed**"
+    distance = np.hypot(xx - width / 2, yy - height / 2) / (MASK_RADIUS * min(width, height))
+    mask = np.clip(MASK_RAMP - distance, 0, 1)  # 1 inside the disc, a soft ramp, 0 outside
+    masked = blur(MASK_PARAMS, image_bytes, image_name, mask=png(mask))
+    mask_change = np.abs(masked - image_px).mean(-1)
+    max_outside = mask_change[mask == 0].max()
+    mean_inside = mask_change[mask == 1].mean()
+    verdict = "outside the mask untouched ✓" if max_outside < 1 / 255 else "**pixels outside the mask changed**"
     mo.vstack([
-        mo.md(f"max change outside mask {outside:.4f} · mean change inside {d[soft == 1].mean():.3f} · {verdict}"),
+        mo.md(f"max change outside mask {max_outside:.4f} · mean change inside {mean_inside:.3f} · {verdict}"),
         row({
             "input": image_px,
-            "mask": soft,
-            f"{MASK_PARAMS['style']} · strength {MASK_PARAMS['strength']} · masked": a_m,
-            "|out − in|": d / max(d.max(), 1e-6),
+            "mask": mask,
+            f"{MASK_PARAMS['style']} · strength {MASK_PARAMS['strength']} · masked": masked,
+            "|out − in|": mask_change / max(mask_change.max(), 1e-6),
         }),
     ])
     return

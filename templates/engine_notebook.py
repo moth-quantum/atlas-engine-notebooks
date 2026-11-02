@@ -149,7 +149,7 @@ def _(mo):
 @app.cell
 def _():
     # cell: engine
-    # upload, submit, wait and download are the Moth API helpers from client.py, inlined in the hidden block at the top.
+    # upload, submit, wait and download: the Moth API helpers, from the hidden block at the top.
     ENGINE_ID = "TODO-v1"
     INPUT_SLOT = "TODO"  # the engine's input slot name
 
@@ -186,7 +186,8 @@ def _(mo):
 def _(example_param, input_file, mo, run, run_engine):
     # cell: run
     mo.stop(not (run.value or AUTORUN), mo.md("Press **Run** to see the result."))
-    result = run_engine({"TODO_param": example_param.value}, input_file.contents(), input_file.name())
+    params = {"TODO_param": example_param.value}  # TODO: one "name": control.value pair per parameter
+    result = run_engine(params, input_file.contents(), input_file.name())
     mo.image(result)  # TODO: show the output the way that suits the engine, e.g. mo.audio, mo.json, a chart
     return
 
@@ -225,7 +226,14 @@ def _(mo):
     ## Experiments
 
     Each experiment changes one parameter and keeps the others fixed. Press its button to run it.
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    # cell: sweep-md
+    mo.md(r"""
     ### TODO_param
 
     TODO: what to look for as the value changes.
