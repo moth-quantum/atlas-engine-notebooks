@@ -30,7 +30,8 @@ with app.setup(hide_code=True):
     # Everything defined here (the API helpers and their imports) is visible to every cell.
 __CLIENT__
 
-    AUTORUN = os.environ.get("MOTH_AUTORUN") == "1"  # headless exports: run every cell without pressing buttons'''
+    # Headless exports: run every cell without pressing buttons. (Own line: marimo drops a trailing comment on save.)
+    AUTORUN = os.environ.get("MOTH_AUTORUN") == "1"'''
 
 HELPERS = '''\
 @app.cell(hide_code=True)

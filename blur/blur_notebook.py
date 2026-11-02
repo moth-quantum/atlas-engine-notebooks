@@ -11,7 +11,7 @@
 import marimo
 
 __generated_with = "0.25.2"
-app = marimo.App(width="medium", app_title="Blur")
+app = marimo.App(width="medium", app_title="Blur", auto_download=["ipynb"])
 
 with app.setup(hide_code=True):
     # cell: setup
@@ -109,7 +109,8 @@ with app.setup(hide_code=True):
         url = out.get("url") or _call("GET", f"/assets/{out['output_asset_id']}/download")["download_url"]
         return _presigned("GET", url).content
 
-    AUTORUN = os.environ.get("MOTH_AUTORUN") == "1"  # headless exports: run every cell without pressing buttons
+    # Headless exports: run every cell without pressing buttons. (Own line: marimo drops a trailing comment on save.)
+    AUTORUN = os.environ.get("MOTH_AUTORUN") == "1"
 
 
 @app.cell(hide_code=True)
