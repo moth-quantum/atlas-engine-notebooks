@@ -16,24 +16,26 @@ app = marimo.App(width="medium", app_title="Blur", auto_download=["ipynb"])
 with app.setup(hide_code=True):
     # cell: setup
     # Shared scaffolding, generated from client.py by scripts/sync_client.py: edit client.py, not this block.
-    # Everything defined here (the API helpers and their imports) is visible to every cell.
-    import hashlib
-    import mimetypes
-    import os
-    import time
-    from pathlib import Path
+    # Only the public helpers and AUTORUN are visible to other cells; import any module you use in your own cells.
+    # Imported under private names so a notebook's setup cell exposes only the public helpers (and the module
+    # names stay free for the notebook's own imports, as they would be with `from moth_atlas import ...`).
+    import hashlib as _hashlib
+    import mimetypes as _mimetypes
+    import os as _os
+    import time as _time
+    from pathlib import Path as _Path
 
-    import requests
+    import requests as _requests
 
 
-    _session = requests.Session()
+    _session = _requests.Session()
     _session.headers["User-Agent"] = "atlas-engine-notebooks"
 
 
     def _call(method, path, **kw):
         # Env is read per call, so a key exported after import still takes effect.
-        base = os.environ.get("MOTH_API_BASE", "https://api.mothquantum.com").rstrip("/")
-        key = os.environ.get("MOTH_API_KEY", "")
+        base = _os.environ.get("MOTH_API_BASE", "https://api.mothquantum.com").rstrip("/")
+        key = _os.environ.get("MOTH_API_KEY", "")
         if not key:
             raise RuntimeError("MOTH_API_KEY is not set: create a key on the Atlas API keys page and export it")
         r = _session.request(method, f"{base}/api/v1{path}", headers={"Authorization": f"Bearer {key}"}, timeout=30, **kw)
@@ -44,7 +46,7 @@ with app.setup(hide_code=True):
 
     def _presigned(method, url, **kw):
         # Presigned URLs carry their own signature: never send the API key to them (plain requests, not _session).
-        r = requests.request(method, url, timeout=60, **kw)
+        r = _requests.request(method, url, timeout=60, **kw)
         if r.status_code >= 400:
             raise RuntimeError(f"{method} presigned URL -> {r.status_code}: {r.text[:300]}")
         return r
@@ -53,7 +55,7 @@ with app.setup(hide_code=True):
     _uploaded = {}  # (sha256, content_type) -> asset_id, so re-running a cell doesn't re-upload
 
 
-    def upload(file: str | os.PathLike | bytes, content_type: str | None = None, filename: str | None = None) -> str:
+    def upload(file: str | _os.PathLike | bytes, content_type: str | None = None, filename: str | None = None) -> str:
         """Upload a file path or raw bytes; returns its asset id.
 
         content_type defaults to a guess from the filename; filename names uploaded bytes.
@@ -61,9 +63,9 @@ with app.setup(hide_code=True):
         if isinstance(file, (bytes, bytearray)):
             data, filename = bytes(file), filename or "file"
         else:
-            data, filename = Path(file).read_bytes(), filename or Path(file).name
-        content_type = content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
-        key = (hashlib.sha256(data).hexdigest(), content_type)
+            data, filename = _Path(file).read_bytes(), filename or _Path(file).name
+        content_type = content_type or _mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        key = (_hashlib.sha256(data).hexdigest(), content_type)
         if key not in _uploaded:
             asset = _call("POST", "/assets", json={"filename": filename, "content_type": content_type, "size_bytes": len(data)})
             up = asset["upload"]
@@ -83,8 +85,8 @@ with app.setup(hide_code=True):
 
         on_update(job) is called whenever the status changes, with the status response as a dict,
         e.g. on_update=lambda job: print(job["status"])."""
-        deadline, last = time.monotonic() + timeout, None
-        while time.monotonic() < deadline:
+        deadline, last = _time.monotonic() + timeout, None
+        while _time.monotonic() < deadline:
             job = _call("GET", f"/jobs/{job_id}/status")
             if on_update and job["status"] != last:
                 on_update(job)
@@ -93,7 +95,7 @@ with app.setup(hide_code=True):
                 return
             if job["status"] in ("failed", "cancelled"):
                 raise RuntimeError(f"Job {job_id} {job['status']}: {job.get('error')}")
-            time.sleep(interval)
+            _time.sleep(interval)
         raise TimeoutError(f"Job {job_id} did not finish in {timeout}s")
 
 
@@ -110,7 +112,7 @@ with app.setup(hide_code=True):
         return _presigned("GET", url).content
 
     # Headless exports: run every cell without pressing buttons. (Own line: marimo drops a trailing comment on save.)
-    AUTORUN = os.environ.get("MOTH_AUTORUN") == "1"
+    AUTORUN = _os.environ.get("MOTH_AUTORUN") == "1"
 
 
 @app.cell(hide_code=True)
@@ -118,6 +120,7 @@ def _(mo):
     # cell: helpers
     # Generated by scripts/sync_client.py. Lists the API helpers from their own signatures and docstrings.
     import inspect as _inspect
+    from os import environ as _environ
 
     _summary = lambda f: _inspect.getdoc(f).partition("\n\n")[0]  # docstring's first paragraph
     _docs = "\n".join(f"{f.__name__}{_inspect.signature(f)}\n    {_summary(f)}" for f in (upload, submit, wait, download))
@@ -125,23 +128,24 @@ def _(mo):
     _missing_key = mo.callout(mo.md(
         "`MOTH_API_KEY` is not set, so the cells that call the engine will fail. "
         "Create a key on the Atlas **API keys** page, export it, and restart the kernel."), kind="warn")
-    mo.vstack([_missing_key, _helpers]) if not os.environ.get("MOTH_API_KEY") else _helpers
+    mo.vstack([_missing_key, _helpers]) if not _environ.get("MOTH_API_KEY") else _helpers
     return
 
 
 @app.cell
 def _():
     # cell: imports
-    # Blur's own imports. The hidden setup cell already provides the API helpers and the modules they use
-    # (os, time, requests, ...), so those are not imported again here.
+    # Blur's own imports. The hidden setup cell provides only the API helpers (upload, submit, wait, download).
     import io
     import math
+    import time
 
     import marimo as mo
     import numpy as np
+    import requests
     from PIL import Image
 
-    return Image, io, math, mo, np
+    return Image, io, math, mo, np, requests, time
 
 
 @app.cell
@@ -199,7 +203,7 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
+def _(mo, requests):
     # cell: default image
     # Uses the uploaded file if there is one, otherwise the sample next to this notebook (fetched from GitHub if missing).
     SAMPLE = "cat.png"
@@ -239,7 +243,7 @@ def _(mo):
 
 
 @app.cell
-def _(Image, as_float, io, mo):
+def _(Image, as_float, io, mo, time):
     # cell: blur
     ENGINE_ID = "blur-v1"
 
