@@ -3,3 +3,4 @@ __pycache__/
 __marimo__/
 *.ipynb_checkpoints
 blur/outputs/*.html
+.DS_Store
