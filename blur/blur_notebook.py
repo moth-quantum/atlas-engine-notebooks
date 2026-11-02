@@ -124,11 +124,15 @@ def _(mo):
 
     _summary = lambda f: _inspect.getdoc(f).partition("\n\n")[0]  # docstring's first paragraph
     _docs = "\n".join(f"{f.__name__}{_inspect.signature(f)}\n    {_summary(f)}" for f in (upload, submit, wait, download))
-    _helpers = mo.accordion({"API helpers (`upload, submit, wait, download`), defined in the hidden setup cell": mo.plain_text(_docs)})
+    _import = mo.md(
+        "```python\nfrom moth_atlas import upload, submit, wait, download\n```\n"
+        "These helpers work as if imported from the `moth_atlas` package. Until it is on PyPI, "
+        "they are defined in the hidden setup cell, so there is nothing to install.")
+    _helpers = mo.accordion({"Helper signatures": mo.plain_text(_docs)})
     _missing_key = mo.callout(mo.md(
         "`MOTH_API_KEY` is not set, so the cells that call the engine will fail. "
         "Create a key on the Atlas **API keys** page, export it, and restart the kernel."), kind="warn")
-    mo.vstack([_missing_key, _helpers]) if not _environ.get("MOTH_API_KEY") else _helpers
+    mo.vstack(([_missing_key] if not _environ.get("MOTH_API_KEY") else []) + [_import, _helpers])
     return
 
 
