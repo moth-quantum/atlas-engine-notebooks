@@ -153,31 +153,11 @@ def _():
 
 @app.cell(hide_code=True)
 def _(mo):
-    # cell: adapt
-    # Delete this cell once the notebook is adapted.
-    mo.callout(mo.md(r"""
-    **Adapting this template.** Edit these cells, in this order, then delete this note:
-
-    1. `engine`: set `ENGINE_ID` and `INPUT_SLOT`, and make `show()` display your engine's output.
-    2. `params` and `run`: one control per parameter, passed in the `run` cell's params dict.
-    3. `parameters`: the table of what goes in and what comes back.
-    4. The prose and the sweep: `intro`, `how`, `experiments-md`, `sweep-params`, `sweep`, `questions`.
-    5. The file header: `app_title` and your extra dependencies.
-
-    Every placeholder is marked `TODO`, so `grep TODO` lists what is left. For a finished example, see `blur/blur_notebook.py`.
-    """), kind="info")
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
     # cell: intro
     mo.md(r"""
     # TODO Engine name
 
     TODO: one or two sentences on what the engine does and what makes its output different.
-
-    This notebook calls the `TODO-v1` engine through the Moth API: **Parameters** lists what you pass, **Try it** runs one job, **How it works** explains the method, and **Experiments** sweeps one parameter at a time.
     """)
     return
 
@@ -204,32 +184,25 @@ def _(mo):
     mo.md(r"""
     ## Try it
 
-    The cell below is the whole API call. Pick an input and the parameters, then press **Run** to submit one job.
+    Pick an input and the parameters, then press **Run** to submit one job.
     """)
     return
 
 
 @app.cell
-def _(mo):
+def _():
     # cell: engine
     ENGINE_ID = "TODO-v1"
     INPUT_SLOT = "TODO"  # the engine's input slot name
 
-    def run_engine(params, file=None, filename="input"):
+    def run_engine(params, file=None, filename=None):
         """Run one job: upload the input, submit, wait, download. Returns file bytes, or a dict for JSON results."""
         input_files = {INPUT_SLOT: upload(file, filename=filename)} if file else None
         job_id = submit(ENGINE_ID, params, input_files)
-        with mo.status.spinner(title=f"Job {job_id}") as spinner:
-            wait(job_id, on_update=lambda job: spinner.update(subtitle=job["status"]))
+        wait(job_id)
         return download(job_id)
 
-    def show(result):
-        """Display one job's output. result is what download() returns: file bytes, or a dict for JSON results.
-        Return anything marimo can display (mo.image, mo.audio, mo.json, a chart, ...)."""
-        # TODO: display the output the way that suits the engine.
-        return mo.image(result) if isinstance(result, bytes) else mo.json(result)
-
-    return run_engine, show
+    return (run_engine,)
 
 
 @app.cell
@@ -252,11 +225,11 @@ def _(mo):
 
 
 @app.cell
-def _(example_param, input_file, mo, run, run_engine, show):
+def _(example_param, input_file, mo, run, run_engine):
     # cell: run
     mo.stop(not (run.value or AUTORUN), mo.md("Press **Run** to submit one job."))
-    result = run_engine({"TODO_param": example_param.value}, input_file.contents(), input_file.name() or "input")
-    show(result)
+    result = run_engine({"TODO_param": example_param.value}, input_file.contents(), input_file.name())
+    mo.image(result)  # TODO: show the output the way that suits the engine, e.g. mo.audio, mo.json, a chart
     return
 
 
@@ -287,36 +260,37 @@ def _(mo):
 
 
 @app.cell
-def _():
+def _(mo):
     # cell: sweep-params
-    # Edit these, then press the run button: one job per value.
+    # Edit the values, then press the button: one job per value.
     SWEEP = (0.0, 0.5, 1.0)
-    return (SWEEP,)
-
-
-@app.cell(hide_code=True)
-def _(SWEEP, mo):
-    # cell: sweep-run
     run_sweep = mo.ui.run_button(label=f"Run sweep ({len(SWEEP)} jobs)")
     run_sweep
-    return (run_sweep,)
+    return SWEEP, run_sweep
 
 
 @app.cell(hide_code=True)
-def _(SWEEP, input_file, mo, run_engine, run_sweep, show):
+def _(SWEEP, input_file, mo, run_engine, run_sweep):
     # cell: sweep
     mo.stop(not (run_sweep.value or AUTORUN), mo.md(f"Press **Run sweep** to run this cell ({len(SWEEP)} jobs)."))
-    sweep = {v: run_engine({"TODO_param": v}, input_file.contents(), input_file.name() or "input") for v in SWEEP}
-    mo.hstack([mo.vstack([show(out), mo.md(f"`TODO_param = {v}`")], align="center") for v, out in sweep.items()], wrap=True)
+    tiles = []
+    for value in SWEEP:
+        out = run_engine({"TODO_param": value}, input_file.contents(), input_file.name())
+        tiles.append(mo.vstack([mo.image(out), mo.md(f"`TODO_param = {value}`")]))
+    mo.hstack(tiles, wrap=True)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     # cell: questions
-    mo.vstack([mo.md("## Questions"), mo.accordion({
-        "TODO: a question new users ask?": "TODO: a short answer.",
-    })])
+    mo.md(r"""
+    ## Questions
+
+    **TODO: a question new users ask?**
+
+    TODO: a short answer.
+    """)
     return
 
 
