@@ -42,10 +42,23 @@ Copy [`templates/engine_notebook.py`](templates/engine_notebook.py) to `<engine>
 
 ## How the notebooks are built
 
-- **Shared helpers.** [`client.py`](client.py) defines `upload`, `submit`, `wait` and `download`. `scripts/sync_client.py` copies it into each notebook's hidden setup cell, so every notebook runs on its own; don't edit that cell or the `helpers` cell by hand. The setup cell provides only those helpers and `AUTORUN`, so import everything else your cells use in the notebook's imports cell.
-- **Cell ids.** Every cell starts with a `# cell: <id>` comment that Atlas uses to match cells to its viewer.
+- **Shared helpers.** [`client.py`](client.py) defines `upload`, `submit`, `wait` and `download`. `scripts/sync_client.py` copies it into each notebook's hidden `with app.setup` block (`# cell: client`), so every notebook runs on its own; don't edit that block by hand. It provides only those helpers and `AUTORUN`, so import everything else your cells use in the notebook's `setup` cell.
 - **Static preview.** With `auto_download=["ipynb"]`, the marimo editor saves the notebook with its outputs to `<engine>/__marimo__/` on every save. `scripts/snapshot.py` copies it to `<engine>/outputs/` for GitHub to render; don't edit that copy.
 - **No secrets.** No credentials, tokens or private hostnames in any file.
+
+## Notebook format
+
+Atlas renders each engine's **Notebook** page from these files, so every notebook follows the same format. The template already does; keep it when you edit.
+
+1. **File.** `<engine>/<engine>_notebook.py`, a plain marimo file with a PEP 723 dependency header, `app_title` set to the engine's display name and `auto_download=["ipynb"]`.
+2. **Generated client.** One hidden `with app.setup` block (`# cell: client`), written by `scripts/sync_client.py`. It defines only `upload`, `submit`, `wait`, `download` and `AUTORUN`.
+3. **Cell ids.** Every `@app.cell` body starts with `# cell: <id>`: lowercase letters, digits and `-`, unique, and kept stable once published.
+4. **Standard cells**, in this order: `setup` (imports), `intro`, `try-md`, the engine cell, inputs, `params`, `run`, `parameters`, `how`, `experiments-md` and the experiments, `questions`. Engine-specific helper cells (Blur's `display-helpers`) go right after `setup`. Each experiment is a `<name>-params` cell (values and run button) followed by a `<name>` result cell.
+5. **Markdown.** A markdown cell is a single `mo.md(r"""…""")` call. No title line, since the page already has one; sections are `##`, subsections `###`. Formulas use `$…$` and `$$…$$`.
+6. **Parameters.** `params` holds one `mo.ui` control per engine parameter, plus the run button. `run` sends them as a dict of `"name": control.value` pairs, and the `parameters` cell documents each one (type, default, effect).
+7. **Questions.** `mo.md("## Questions")` plus `mo.accordion({...})` of `"question": "answer"` string pairs.
+8. **No surprise jobs.** Nothing calls the API until a run button is pressed (`mo.stop(not (button.value or AUTORUN), …)`), and reader-facing text stays about the science and the results.
+9. **Saved outputs.** `<engine>/outputs/<engine>_notebook.ipynb` is the notebook's saved run (see "Static preview").
 
 ## License
 
