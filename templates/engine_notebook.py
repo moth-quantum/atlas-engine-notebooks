@@ -13,11 +13,7 @@
 import marimo
 
 __generated_with = "0.25.2"
-app = marimo.App(
-    width="medium",
-    app_title="TODO Engine name",
-    auto_download=["ipynb"],
-)
+app = marimo.App(width="medium", app_title="TODO Engine name", auto_download=["ipynb"])
 
 with app.setup(hide_code=True):
     # cell: setup
@@ -130,15 +126,14 @@ def _(mo):
 
     _summary = lambda f: _inspect.getdoc(f).partition("\n\n")[0]  # docstring's first paragraph
     _docs = "\n".join(f"{f.__name__}{_inspect.signature(f)}\n    {_summary(f)}" for f in (upload, submit, wait, download))
-    _import = mo.md(
-        "```python\nfrom moth_atlas import upload, submit, wait, download\n```\n"
-        "These helpers work as if imported from the `moth_atlas` package. Until it is on PyPI, "
-        "they are defined in the hidden setup cell, so there is nothing to install.")
+    _import = mo.md("```python\nfrom moth_atlas import upload, submit, wait, download  # defined in the hidden setup cell until moth_atlas is on PyPI\n```")
     _helpers = mo.accordion({"Helper signatures": mo.plain_text(_docs)})
     _missing_key = mo.callout(mo.md(
         "`MOTH_API_KEY` is not set, so the cells that call the engine will fail. "
         "Create a key on the Atlas **API keys** page, export it, and restart the kernel."), kind="warn")
-    mo.vstack(([_missing_key] if not _environ.get("MOTH_API_KEY") else []) + [_import, _helpers])
+    # The import line and signatures are for notebook authors: shown while editing, hidden in the app view.
+    _for_authors = [_import, _helpers] if mo.app_meta().mode == "edit" else []
+    mo.vstack(([_missing_key] if not _environ.get("MOTH_API_KEY") else []) + _for_authors)
     return
 
 
@@ -164,27 +159,11 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    # cell: parameters
-    mo.md(r"""
-    ## Parameters
-
-    | name | type | default | what it does |
-    |---|---|---|---|
-    | `TODO` (input file) | TODO: accepted formats | required | TODO |
-    | `TODO_param` | float, 0 to 1 | 0.5 | TODO |
-
-    **Returns:** TODO: a file in the `result` slot, or a JSON result.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
     # cell: try-md
     mo.md(r"""
     ## Try it
 
-    Pick an input and the parameters, then press **Run** to submit one job.
+    Pick an input and the parameters, then press **Run**.
     """)
     return
 
@@ -227,9 +206,25 @@ def _(mo):
 @app.cell
 def _(example_param, input_file, mo, run, run_engine):
     # cell: run
-    mo.stop(not (run.value or AUTORUN), mo.md("Press **Run** to submit one job."))
+    mo.stop(not (run.value or AUTORUN), mo.md("Press **Run** to see the result."))
     result = run_engine({"TODO_param": example_param.value}, input_file.contents(), input_file.name())
     mo.image(result)  # TODO: show the output the way that suits the engine, e.g. mo.audio, mo.json, a chart
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    # cell: parameters
+    mo.md(r"""
+    ## Parameters
+
+    | name | type | default | what it does |
+    |---|---|---|---|
+    | `TODO` (input file) | TODO: accepted formats | required | TODO |
+    | `TODO_param` | float, 0 to 1 | 0.5 | TODO |
+
+    **Returns:** TODO: what comes back.
+    """)
     return
 
 
@@ -250,7 +245,7 @@ def _(mo):
     mo.md(r"""
     ## Experiments
 
-    Each experiment sweeps one parameter with the others fixed. Nothing is submitted until you press its run button.
+    Each experiment changes one parameter and keeps the others fixed. Press its button to run it.
 
     ### TODO_param
 
@@ -272,7 +267,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(SWEEP, input_file, mo, run_engine, run_sweep):
     # cell: sweep
-    mo.stop(not (run_sweep.value or AUTORUN), mo.md(f"Press **Run sweep** to run this cell ({len(SWEEP)} jobs)."))
+    mo.stop(not (run_sweep.value or AUTORUN), mo.md("Press **Run sweep** to compare the values above."))
     tiles = []
     for value in SWEEP:
         out = run_engine({"TODO_param": value}, input_file.contents(), input_file.name())
@@ -284,13 +279,9 @@ def _(SWEEP, input_file, mo, run_engine, run_sweep):
 @app.cell(hide_code=True)
 def _(mo):
     # cell: questions
-    mo.md(r"""
-    ## Questions
-
-    **TODO: a question new users ask?**
-
-    TODO: a short answer.
-    """)
+    mo.vstack([mo.md("## Questions"), mo.accordion({
+        "TODO: a question new users ask?": "TODO: a short answer.",
+    })])
     return
 
 

@@ -2,55 +2,50 @@
 
 [marimo](https://marimo.io) notebooks for the engines on [Atlas](https://platform.mothquantum.com), Moth Quantum's platform. Each notebook runs an engine through the public Moth API and explains what it does. Atlas reads these notebooks to render each engine's **Notebook** page, and **Fork** on that page gives you your own copy of the same file.
 
-| engine | notebook | what it shows |
+| engine | notebook | static preview |
 |---|---|---|
-| `blur-v1` | [`blur/blur_notebook.py`](blur/blur_notebook.py) | one run, strength / reach / gate-style sweeps, masking, the I/O contract |
+| `blur-v1` | [`blur/blur_notebook.py`](blur/blur_notebook.py) | [`blur/outputs/blur_notebook.ipynb`](blur/outputs/blur_notebook.ipynb) |
 
-## Run it yourself
+## Run a notebook
 
-You need a Moth API key from the Atlas **API keys** page. Keys are read from the environment only; nothing in this repo ever contains one.
+You need a Moth API key from the Atlas **API keys** page. Keys are read from the environment only; nothing in this repo contains one.
 
 ```bash
 pip install -r requirements.txt
-export MOTH_API_KEY=...          # from Atlas → API keys
+export MOTH_API_KEY=...
 marimo edit blur/blur_notebook.py
 ```
 
-Each notebook carries its own generated copy of the shared helpers from [`client.py`](client.py) in a hidden setup cell, so it also runs on its own. If the sample image isn't next to the notebook it is fetched from this repo.
-
-Or open it straight from GitHub without cloning. `--sandbox` installs the dependencies listed in the notebook's header into an isolated environment:
+Or open it straight from GitHub, with its dependencies installed into an isolated environment:
 
 ```bash
 marimo edit --sandbox https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur/blur_notebook.py
 ```
 
-Press **Run Blur** to submit one job. Each experiment (strength, reach and style, mask) has its own run button, and its sweep values are plain constants in the cell above it. Nothing is submitted until you press a button.
-
-## Headless run (what Atlas's export does)
-
-`MOTH_AUTORUN=1` makes every cell run without pressing buttons, so the notebook can be executed and captured in CI:
-
-```bash
-MOTH_API_KEY=... scripts/export.sh blur
-```
-
-writes `blur/outputs/blur_notebook.ipynb` (code, markdown and outputs) and `blur/outputs/blur_notebook.html`.
-
-## Environment
+Nothing is submitted until you press a run button.
 
 | variable | default | purpose |
 |---|---|---|
-| `MOTH_API_KEY` | — | bearer token for the Moth API (required to run jobs) |
-| `MOTH_API_BASE` | `https://api.mothquantum.com` | API origin; point it at a mock or a staging API |
-| `MOTH_AUTORUN` | unset | `1` runs every cell headlessly (no buttons) |
+| `MOTH_API_KEY` | none | API key (required to run jobs) |
+| `MOTH_API_BASE` | `https://api.mothquantum.com` | point at a staging API or a mock |
+| `MOTH_AUTORUN` | unset | `1` runs every cell without pressing buttons, for headless exports (`scripts/export.sh <engine>`) |
 
-## Layout and conventions
+## Add an engine
 
-- One folder per engine, named after the Atlas page slug: `<engine>/<engine>_notebook.py`, its sample inputs beside it, saved outputs under `<engine>/outputs/`.
-- Every `@app.cell` starts with a `# cell: <id>` comment. Atlas uses these ids to match cells to its viewer; keep them stable.
-- Shared helpers: [`client.py`](client.py) (`upload`, `submit`, `wait`, `download`; needs only `requests`) is the source of truth. `scripts/sync_client.py` copies it into each notebook's hidden `with app.setup` cell (plus `AUTORUN`) and adds a `helpers` cell listing them; `--check` exits 1 if a notebook is stale. Don't edit those cells by hand. The setup cell exposes only the four helpers and `AUTORUN` (client.py imports its modules under private names), so import every other module you use, `os`, `time`, `requests` included, in the notebook's own imports cell; the notebooks then keep working unchanged when the inline copy is replaced by a package import. Start a new notebook from [`templates/engine_notebook.py`](templates/engine_notebook.py).
-- The API client in each notebook follows the Moth wire contract as Atlas uses it: `POST /api/v1/assets` (JSON `filename`/`content_type`/`size_bytes`) → `asset_id` + presigned `upload`, `PUT` the bytes there, then `POST /api/v1/assets/<id>/complete`; `POST /api/v1/engines/<id>/process` → `job_id`; poll `GET /api/v1/jobs/<id>/status`; `GET /api/v1/jobs/<id>/result` → `outputs[]` with `slot` and a presigned `url`.
-- No credentials, no tokens, no private hostnames in any file. `marimo check <file>` must pass.
+Copy [`templates/engine_notebook.py`](templates/engine_notebook.py) to `<engine>/<engine>_notebook.py` and fill in every `TODO`; [`blur/blur_notebook.py`](blur/blur_notebook.py) is a finished example. Before opening a pull request, check that:
+
+- [ ] the notebook is in its own folder, `<engine>/`, with any sample inputs beside it
+- [ ] no `TODO` is left, and the header lists every package the notebook imports
+- [ ] `marimo check <engine>/<engine>_notebook.py` and `python scripts/sync_client.py --check` both pass
+- [ ] the static preview is refreshed: press every run button in the editor, save, then run `python scripts/snapshot.py <engine>`
+- [ ] `<engine>/README.md` says in a few lines what the engine does, and the engine has a row in the table above
+
+## How the notebooks are built
+
+- **Shared helpers.** [`client.py`](client.py) defines `upload`, `submit`, `wait` and `download`. `scripts/sync_client.py` copies it into each notebook's hidden setup cell, so every notebook runs on its own; don't edit that cell or the `helpers` cell by hand. The setup cell provides only those helpers and `AUTORUN`, so import everything else your cells use in the notebook's imports cell.
+- **Cell ids.** Every cell starts with a `# cell: <id>` comment that Atlas uses to match cells to its viewer.
+- **Static preview.** With `auto_download=["ipynb"]`, the marimo editor saves the notebook with its outputs to `<engine>/__marimo__/` on every save. `scripts/snapshot.py` copies it to `<engine>/outputs/` for GitHub to render; don't edit that copy.
+- **No secrets.** No credentials, tokens or private hostnames in any file.
 
 ## License
 

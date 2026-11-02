@@ -124,32 +124,30 @@ def _(mo):
 
     _summary = lambda f: _inspect.getdoc(f).partition("\n\n")[0]  # docstring's first paragraph
     _docs = "\n".join(f"{f.__name__}{_inspect.signature(f)}\n    {_summary(f)}" for f in (upload, submit, wait, download))
-    _import = mo.md(
-        "```python\nfrom moth_atlas import upload, submit, wait, download\n```\n"
-        "These helpers work as if imported from the `moth_atlas` package. Until it is on PyPI, "
-        "they are defined in the hidden setup cell, so there is nothing to install.")
+    _import = mo.md("```python\nfrom moth_atlas import upload, submit, wait, download  # defined in the hidden setup cell until moth_atlas is on PyPI\n```")
     _helpers = mo.accordion({"Helper signatures": mo.plain_text(_docs)})
     _missing_key = mo.callout(mo.md(
         "`MOTH_API_KEY` is not set, so the cells that call the engine will fail. "
         "Create a key on the Atlas **API keys** page, export it, and restart the kernel."), kind="warn")
-    mo.vstack(([_missing_key] if not _environ.get("MOTH_API_KEY") else []) + [_import, _helpers])
+    # The import line and signatures are for notebook authors: shown while editing, hidden in the app view.
+    _for_authors = [_import, _helpers] if mo.app_meta().mode == "edit" else []
+    mo.vstack(([_missing_key] if not _environ.get("MOTH_API_KEY") else []) + _for_authors)
     return
 
 
 @app.cell
 def _():
     # cell: imports
-    # Blur's own imports. The hidden setup cell provides only the API helpers (upload, submit, wait, download).
+    # Import every module your cells use here. The hidden setup cell provides only the API helpers.
     import io
     import math
-    import time
 
     import marimo as mo
     import numpy as np
     import requests
     from PIL import Image
 
-    return Image, io, math, mo, np, requests, time
+    return Image, io, math, mo, np, requests
 
 
 @app.cell
@@ -181,21 +179,36 @@ def _(mo):
     # Blur
 
     Quantum Blur turns an image into a single quantum state, rotates every qubit once, and measures the state back into pixels. One gate moves amplitude between pixels that can be far apart, so instead of soft focus you get echoes and interference that no convolution kernel produces.
-
-    This notebook calls the `blur-v1` engine through the Moth API: **Try it** runs it with your parameters, **How it works** explains the circuit, **Experiments** sweeps one parameter at a time, and **Reference** lists exactly what goes in and comes out.
     """)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    # cell: image-md
+    # cell: try-md
     mo.md(r"""
-    ## Load an image
+    ## Try it
 
-    Drop your own image below, or leave it empty to use the sample cat that ships with this notebook.
+    Drop an image (or leave it empty to use the sample cat), pick the parameters, then press **Run Blur**.
     """)
     return
+
+
+@app.cell
+def _(Image, as_float, io):
+    # cell: blur
+    ENGINE_ID = "blur-v1"
+
+    def blur(params, image, filename, mask=None):
+        """Run one Blur job: upload the image (and mask), submit, wait, download. Returns a float RGB array in [0, 1]."""
+        input_files = {"image": upload(image, filename=filename)}
+        if mask is not None:
+            input_files["mask"] = upload(mask, filename="mask.png")
+        job_id = submit(ENGINE_ID, params, input_files)
+        wait(job_id)
+        return as_float(Image.open(io.BytesIO(download(job_id))))
+
+    return (blur,)
 
 
 @app.cell
@@ -235,56 +248,14 @@ def _(Image, SAMPLE, as_float, image_upload, io, load_sample, math, mo):
     return height, image_bytes, image_name, image_px, width
 
 
-@app.cell(hide_code=True)
-def _(mo):
-    # cell: blur-md
-    mo.md(r"""
-    ## Call the engine
-
-    Every engine is called with the same four helpers: `upload` the inputs, `submit` a job, `wait` for it, `download` the output. What is specific to Blur is the engine id, its input slots (`image`, optional `mask`) and decoding the output image.
-    """)
-    return
-
-
-@app.cell
-def _(Image, as_float, io, mo, time):
-    # cell: blur
-    ENGINE_ID = "blur-v1"
-
-    def blur(params, image, filename, mask=None):
-        """Run one Blur job on image (bytes named filename). Returns (float RGB array in [0, 1], seconds)."""
-        input_files = {"image": upload(image, filename=filename)}
-        if mask is not None:
-            input_files["mask"] = upload(mask, filename="mask.png")
-        t0 = time.perf_counter()
-        job_id = submit(ENGINE_ID, params, input_files)
-        with mo.status.spinner(title=f"Blur job {job_id}") as spinner:
-            wait(job_id, on_update=lambda job: spinner.update(subtitle=job["status"]))
-        data = download(job_id)
-        return as_float(Image.open(io.BytesIO(data))), time.perf_counter() - t0
-
-    return (blur,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    # cell: try-md
-    mo.md(r"""
-    ## Try it
-
-    The engine's parameters, all optional. Change a control, then press **Run Blur** to submit one job.
-    """)
-    return
-
-
 @app.cell
 def _(mo):
     # cell: params
-    strength = mo.ui.slider(0, 1, step=0.05, value=0.5, label="Strength")  # 0..1 rotation scale; 0 = identity
+    strength = mo.ui.slider(0, 1, step=0.05, value=0.5, label="Strength")
     style = mo.ui.radio(options={"RX · spread": "rx", "RY · edges": "ry"}, value="RX · spread", label="Gate style")
-    reach = mo.ui.slider(0, 1, step=0.05, value=0.0, label="Reach")  # 0 = local angles, 1 = every qubit turns equally
-    size = mo.ui.slider(8, 1024, step=8, value=1024, label="Size")  # pixel budget per pass -> 2*ceil(log2 size) qubits
-    downscale = mo.ui.checkbox(value=True, label="Downscale large regions")  # over budget: shrink (on) or tile (off)
+    reach = mo.ui.slider(0, 1, step=0.05, value=0.0, label="Reach")
+    size = mo.ui.slider(8, 1024, step=8, value=1024, label="Size")
+    downscale = mo.ui.checkbox(value=True, label="Downscale large regions")
     run = mo.ui.run_button(label="Run Blur")
     mo.vstack([strength, style, reach, size, downscale, run])
     return downscale, reach, run, size, strength, style
@@ -307,15 +278,36 @@ def _(
     style,
 ):
     # cell: run
-    mo.stop(not (run.value or AUTORUN), mo.md("Press **Run Blur** to submit a job with the parameters above."))
+    mo.stop(not (run.value or AUTORUN), mo.md("Press **Run Blur** to blur the image with these settings."))
     PARAMS = {"strength": strength.value, "style": style.value, "reach": reach.value, "size": size.value, "downscale": downscale.value}
-    a_out, t = blur(PARAMS, image_bytes, image_name)
+    a_out = blur(PARAMS, image_bytes, image_name)
     diff = np.abs(a_out - image_px)
     mo.vstack([
-        mo.md(f"`{PARAMS}` · {t:.1f} s · mean |out − in| = {diff.mean():.3f}"),
+        mo.md(f"`{PARAMS}` · mean |out − in| = {diff.mean():.3f}"),
         row({"input": image_px, f"{PARAMS['style']} · strength {PARAMS['strength']} · reach {PARAMS['reach']}": a_out,
              "|out − in|": diff.mean(-1) / max(diff.max(), 1e-6)}),
     ])
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    # cell: parameters
+    mo.md(r"""
+    ## Parameters
+
+    | name | type | default | what it does |
+    |---|---|---|---|
+    | `image` (input file) | PNG / JPEG / WebP / TIFF / BMP, any mode | required | blurred one RGB channel at a time; alpha is passed through |
+    | `mask` (input file) | image | none | blurs each connected region of the mask on its own and blends by mask intensity; without one, the alpha channel is used, else the whole canvas |
+    | `strength` | float, 0 to 1 | 0.5 | scales every rotation; 0 returns the input unchanged |
+    | `style` | `rx` or `ry` | `rx` | `rx` spreads echoes across the image, `ry` concentrates them on edges |
+    | `reach` | float, 0 to 1 | 0 | 0 weights each angle by local brightness, 1 turns every qubit equally |
+    | `size` | int, 8 to 1024 | 1024 | pixel budget per pass: $2\lceil\log_2 \text{size}\rceil$ qubits |
+    | `downscale` | bool | true | a region over budget is downscaled (true) or tiled (false), never the whole image |
+
+    **Returns:** the blurred image, in the same format and size as the input.
+    """)
     return
 
 
@@ -348,37 +340,24 @@ def _(mo):
     mo.md(r"""
     ## Experiments
 
-    Each experiment sweeps one parameter with the others fixed, so you can see what it does on its own. Each has its own run button, and nothing is submitted until you press it.
-    """)
-    return
+    Each experiment changes one parameter and keeps the others fixed. Press its button to run it.
 
-
-@app.cell(hide_code=True)
-def _(mo):
-    # cell: strength-md
-    mo.md(r"""
     ### Strength
 
-    $\xi$ scales every angle. At 0 the round trip is exact; the echoes grow with it up to the schema's limit of 1 (past that the rotations would start to undo themselves, which is why the engine stops there).
+    $\xi$ scales every angle. At 0 the round trip is exact; the echoes grow with it up to the limit of 1 (past that the rotations would start to undo themselves, which is why the engine stops there).
     """)
     return
 
 
 @app.cell
-def _():
+def _(mo):
     # cell: strength-params
-    # Edit these, then press the run button: one job per value in the sweep.
+    # Edit the values, then press the button: one job per value.
     STRENGTH_SWEEP = (0.0, 0.25, 0.5, 0.75, 1.0)
     STRENGTH_FIXED = {"style": "rx", "reach": 0.0}
-    return STRENGTH_FIXED, STRENGTH_SWEEP
-
-
-@app.cell(hide_code=True)
-def _(STRENGTH_SWEEP, mo):
-    # cell: strength-run
     run_strength = mo.ui.run_button(label=f"Run strength sweep ({len(STRENGTH_SWEEP)} jobs)")
     run_strength
-    return (run_strength,)
+    return STRENGTH_FIXED, STRENGTH_SWEEP, run_strength
 
 
 @app.cell(hide_code=True)
@@ -395,8 +374,8 @@ def _(
     run_strength,
 ):
     # cell: strength
-    mo.stop(not (run_strength.value or AUTORUN), mo.md(f"Press **Run strength sweep** to run this cell ({len(STRENGTH_SWEEP)} jobs)."))
-    outs = {k: blur({**STRENGTH_FIXED, "strength": k}, image_bytes, image_name)[0] for k in STRENGTH_SWEEP}
+    mo.stop(not (run_strength.value or AUTORUN), mo.md("Press **Run strength sweep** to compare the strengths above."))
+    outs = {k: blur({**STRENGTH_FIXED, "strength": k}, image_bytes, image_name) for k in STRENGTH_SWEEP}
     diffs = {k: round(float(np.abs(o - image_px).mean()), 3) for k, o in outs.items()}
     mo.vstack([
         mo.md(f"**{STRENGTH_FIXED['style']} · reach {STRENGTH_FIXED['reach']}** — label shows mean |out − in|"),
@@ -417,21 +396,15 @@ def _(mo):
 
 
 @app.cell
-def _():
+def _(mo):
     # cell: reach-params
-    # Edit these, then press the run button: one job per style × reach.
+    # Edit the values, then press the button: one job per style × reach.
     REACH_SWEEP = (0.0, 0.5, 1.0)
     REACH_STYLES = ("rx", "ry")
     REACH_FIXED = {"strength": 0.5}
-    return REACH_FIXED, REACH_STYLES, REACH_SWEEP
-
-
-@app.cell(hide_code=True)
-def _(REACH_STYLES, REACH_SWEEP, mo):
-    # cell: reach-run
     run_reach = mo.ui.run_button(label=f"Run reach and style sweep ({len(REACH_STYLES) * len(REACH_SWEEP)} jobs)")
     run_reach
-    return (run_reach,)
+    return REACH_FIXED, REACH_STYLES, REACH_SWEEP, run_reach
 
 
 @app.cell(hide_code=True)
@@ -448,12 +421,12 @@ def _(
     run_reach,
 ):
     # cell: reach
-    mo.stop(not (run_reach.value or AUTORUN), mo.md(f"Press **Run reach and style sweep** to run this cell ({len(REACH_STYLES) * len(REACH_SWEEP)} jobs)."))
+    mo.stop(not (run_reach.value or AUTORUN), mo.md("Press **Run reach and style sweep** to compare both gate styles across reach."))
     rows = []
     for st in REACH_STYLES:
         panels = {"input": image_px}
         for r in REACH_SWEEP:
-            o = blur({**REACH_FIXED, "style": st, "reach": r}, image_bytes, image_name)[0]
+            o = blur({**REACH_FIXED, "style": st, "reach": r}, image_bytes, image_name)
             panels[f"{st} · reach {r} · mean {o.mean():.2f}"] = o
         rows.append(row(panels, width=170))
     mo.vstack([mo.md(f"**strength {REACH_FIXED['strength']}** · input mean brightness {image_px.mean():.2f}"), *rows])
@@ -472,21 +445,15 @@ def _(mo):
 
 
 @app.cell
-def _():
+def _(mo):
     # cell: mask-params
-    # Edit these, then press the run button (one job).
+    # Edit these, then press the button (one job).
     MASK_PARAMS = {"style": "rx", "reach": 0.0, "strength": 0.8}
     MASK_RADIUS = 0.28  # disc scale, as a fraction of the image's shorter side
     MASK_RAMP = 1.6  # mask = clip(MASK_RAMP - distance / radius, 0, 1): 1 inside, a soft edge, 0 outside
-    return MASK_PARAMS, MASK_RADIUS, MASK_RAMP
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    # cell: mask-run
     run_mask = mo.ui.run_button(label="Run mask experiment (1 job)")
     run_mask
-    return (run_mask,)
+    return MASK_PARAMS, MASK_RADIUS, MASK_RAMP, run_mask
 
 
 @app.cell(hide_code=True)
@@ -507,15 +474,15 @@ def _(
     width,
 ):
     # cell: mask
-    mo.stop(not (run_mask.value or AUTORUN), mo.md("Press **Run mask experiment** to run this cell (1 job)."))
+    mo.stop(not (run_mask.value or AUTORUN), mo.md("Press **Run mask experiment** to blur only inside the disc."))
     yy, xx = np.mgrid[0:height, 0:width]
     soft = np.clip(MASK_RAMP - np.hypot(xx - width / 2, yy - height / 2) / (MASK_RADIUS * min(width, height)), 0, 1)
-    a_m, t_mask = blur(MASK_PARAMS, image_bytes, image_name, mask=png(soft))
+    a_m = blur(MASK_PARAMS, image_bytes, image_name, mask=png(soft))
     d = np.abs(a_m - image_px).mean(-1)
     outside = d[soft == 0].max()
-    verdict = "outside the mask untouched ✓" if outside < 1 / 255 else "**outside the mask changed — the blend contract is broken**"
+    verdict = "outside the mask untouched ✓" if outside < 1 / 255 else "**pixels outside the mask changed**"
     mo.vstack([
-        mo.md(f"{t_mask:.1f} s · max change outside mask {outside:.4f} · mean change inside {d[soft == 1].mean():.3f} · {verdict}"),
+        mo.md(f"max change outside mask {outside:.4f} · mean change inside {d[soft == 1].mean():.3f} · {verdict}"),
         row({
             "input": image_px,
             "mask": soft,
@@ -528,26 +495,8 @@ def _(
 
 @app.cell(hide_code=True)
 def _(mo):
-    # cell: contract
-    mo.md(r"""
-    ## Reference
-
-    ### What you send, what comes back
-
-    | you send | the engine does |
-    |---|---|
-    | `image` (PNG / JPEG / WebP / TIFF / BMP, any mode) | one statevector per RGB channel per region; alpha passed through; same format and size back |
-    | `mask`, or none | connected regions of the mask (after a small-noise bin and min-region filter); else the alpha channel; else the whole canvas |
-    | `strength`, `style`, `reach` | the per-qubit angles above |
-    | `size`, `downscale` | the qubit budget: a region over budget is downscaled or tiled per region, never the whole image |
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
     # cell: questions
-    mo.vstack([mo.md("### Questions"), mo.accordion({
+    mo.vstack([mo.md("## Questions"), mo.accordion({
         "Is this running on real quantum hardware?":
             "No. Blur runs on a classical statevector simulator, so jobs run on CPU or GPU. The circuits and the interference are real; the execution is emulated. That keeps results exact and repeatable with no shot noise. Real hardware would need very high connectivity and enough shots to rebuild the whole state, which is not yet practical at image scale.",
         "Why does it look different from a classical blur?":
