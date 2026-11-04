@@ -7,9 +7,9 @@
 # ]
 # ///
 
-# Template for a new engine notebook: copy it to <engine>/<engine>_notebook.py and fill in every TODO.
-# Then run every cell with your key, press each run button, save, and commit (the hook publishes the run).
-# Finished example: blur/blur_notebook.py
+# Template for game and render asset engines: parameters in, a downloadable asset out.
+# Copy it to <engine>/<engine>_notebook.py and fill in every TODO. Run every cell with your key, press each run
+# button, save, and commit: the hook publishes the run.
 
 import marimo
 
@@ -122,9 +122,11 @@ with app.setup(hide_code=True):
 def _():
     # cell: setup
     # Import every module your cells use here; the hidden block at the top provides only the API helpers.
-    import marimo as mo
+    import io
+    import zipfile
 
-    return (mo,)
+    import marimo as mo
+    return io, mo, zipfile
 
 
 @app.cell(hide_code=True)
@@ -142,57 +144,59 @@ def _(mo):
     mo.md(r"""
     ## Try it
 
-    Pick an input and the parameters, then press **Run**.
+    Set the parameters, then press **Generate**. Preview the asset here, or download it.
     """)
     return
 
 
 @app.cell
-def _():
+def _(io, mo, zipfile):
     # cell: engine
     # upload, submit, wait and download: the Moth API helpers, from the hidden block at the top.
-    # Use them as below, or call the API your own way.
     ENGINE_ID = "TODO-v1"
-    INPUT_SLOT = "TODO"  # the engine's input slot name
+    ASSET_NAME = "TODO.zip"  # the filename readers download
 
-    def run_engine(params, file=None, filename=None):
-        """Run one job: upload the input, submit, wait, download. Returns file bytes, or a dict for JSON results."""
-        input_files = {INPUT_SLOT: upload(file, filename=filename)} if file else None
-        job_id = submit(ENGINE_ID, params, input_files)
+    def run_engine(params):
+        """Run one job; returns the asset file's bytes."""
+        job_id = submit(ENGINE_ID, params)
         wait(job_id)
         return download(job_id)
 
-    return (run_engine,)
+    def preview(asset):
+        """One tab per file in the asset (a zip, or a single file): images shown, text in a code viewer."""
+        z = zipfile.ZipFile(io.BytesIO(asset)) if zipfile.is_zipfile(io.BytesIO(asset)) else None
+        files = {n: z.read(n) for n in z.namelist() if not n.endswith("/")} if z else {ASSET_NAME: asset}
+        def show(name, data):
+            if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                return mo.image(data, width=320)
+            try:
+                return mo.ui.code_editor(data.decode(), disabled=True)
+            except UnicodeDecodeError:
+                return mo.md(f"{len(data):,} bytes, no preview")
+        return mo.ui.tabs({name: show(name, data) for name, data in files.items()})
 
-
-@app.cell
-def _(mo):
-    # cell: input
-    # TODO: delete this cell, and its use below, if the engine takes no input file.
-    input_file = mo.ui.file(kind="area", label="Drop an input file here")
-    input_file
-    return (input_file,)
+    return ASSET_NAME, preview, run_engine
 
 
 @app.cell
 def _(mo):
     # cell: params
     # Keys are the engine's parameter names, so params.value is the dict sent to the API.
-    # TODO: one control per parameter, with the engine's ranges and defaults.
+    # TODO: one control per parameter (mo.ui.slider, number, dropdown, switch, ...), with the engine's defaults.
     params = mo.ui.dictionary({
         "TODO_param": mo.ui.slider(0, 1, step=0.05, value=0.5, label="TODO_param"),
     })
-    run = mo.ui.run_button(label="Run")
+    run = mo.ui.run_button(label="Generate")
     mo.vstack([params.vstack(), run])
     return params, run
 
 
 @app.cell
-def _(input_file, mo, params, run, run_engine):
+def _(ASSET_NAME, mo, params, preview, run, run_engine):
     # cell: run
-    mo.stop(not (run.value or AUTORUN), mo.md("Press **Run** to see the result."))
-    result = run_engine(params.value, input_file.contents(), input_file.name())
-    mo.image(result)  # TODO: show the output the way that suits the engine, e.g. mo.audio, mo.json, a chart
+    mo.stop(not (run.value or AUTORUN), mo.md("Press **Generate** to see the result."))
+    asset = run_engine(params.value)
+    mo.vstack([mo.download(asset, filename=ASSET_NAME), preview(asset)])
     return
 
 
@@ -204,7 +208,6 @@ def _(mo):
 
     | name | type | default | what it does |
     |---|---|---|---|
-    | `TODO` (input file) | TODO: accepted formats | required | TODO |
     | `TODO_param` | float, 0 to 1 | 0.5 | TODO |
 
     **Returns:** TODO: what comes back.
@@ -256,14 +259,11 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(SWEEP, input_file, mo, run_engine, run_sweep):
+def _(ASSET_NAME, SWEEP, mo, params, preview, run_engine, run_sweep):
     # cell: sweep
     mo.stop(not (run_sweep.value or AUTORUN), mo.md("Press **Run sweep** to compare the values above."))
-    tiles = []
-    for value in SWEEP:
-        out = run_engine({"TODO_param": value}, input_file.contents(), input_file.name())
-        tiles.append(mo.vstack([mo.image(out), mo.md(f"`TODO_param = {value}`")]))
-    mo.hstack(tiles, wrap=True)
+    assets = {f"TODO_param = {v}": run_engine({**params.value, "TODO_param": v}) for v in SWEEP}
+    mo.ui.tabs({k: mo.vstack([mo.download(a, filename=ASSET_NAME), preview(a)]) for k, a in assets.items()})
     return
 
 

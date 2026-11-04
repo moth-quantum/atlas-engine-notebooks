@@ -52,11 +52,21 @@ The hook generates a renderable `.ipynb` of your saved results for GitHub and At
 
 ### Create your notebook
 
-Copy the template into your engine's folder and put any sample inputs beside it. Follow the `TODO`s, or use the [Blur notebook](blur/blur_notebook.py) as a complete example.
+Pick the template for your kind of engine, copy it into your engine's folder, and put any sample inputs beside it. Fill in the `TODO`s and add what your engine needs.
+
+| template | input | output shown as |
+|---|---|---|
+| [`core_engine`](templates/core_engine_notebook.py) | parameters | JSON, and a table for the sweep |
+| [`image_engine`](templates/image_engine_notebook.py) | an image + parameters | a before/after slider, and a gallery for the sweep |
+| [`audio_engine`](templates/audio_engine_notebook.py) | audio + parameters | before and after players |
+| [`generative_engine`](templates/generative_engine_notebook.py) | an example to train on, then parameters to generate | the trained model to download, and the generated sequence |
+| [`asset_engine`](templates/asset_engine_notebook.py) | parameters | a download button, and a preview tab per file |
 
 ```bash
-mkdir <engine> && cp templates/engine_notebook.py <engine>/<engine>_notebook.py
+mkdir <engine> && cp templates/<kind>_engine_notebook.py <engine>/<engine>_notebook.py
 ```
+
+The [Blur notebook](blur/blur_notebook.py) is a finished image engine notebook.
 
 ### Write, run and save
 
