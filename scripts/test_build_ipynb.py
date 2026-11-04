@@ -5,8 +5,8 @@
 
 Builds a throwaway repo from this checkout's scripts and Blur, adds a second engine, installs the hook, and commits:
 a full commit, a partial one (staged notebook A, unstaged edits B with B's run), an unrelated commit, two engines with
-newer runs where only one is committed, a manual build with unstaged edits, and a run with an error. A saved run is
-rebuilt from the static .ipynb, so no API key or editor is needed.
+newer runs where only one is committed, a manual build with unstaged edits, a run with an error, and a notebook
+with no saved run. A saved run is rebuilt from the static .ipynb, so no API key or editor is needed.
 """
 
 import json
@@ -129,5 +129,9 @@ try:
     edit("blur", " (F)")
     sh("git", "add", "blur/blur_notebook.py")
     check("run with an error: blocked", not commit("F"))
+
+    saved.unlink()  # as if auto_download=["ipynb"] were missing: marimo never wrote the saved run
+    r = sh("git", "commit", "-qm", "G", ok=False)
+    check("staged notebook with no saved run: blocked, says why", r.returncode != 0 and "no saved run" in r.stdout + r.stderr)
 finally:
     shutil.rmtree(REPO, ignore_errors=True)

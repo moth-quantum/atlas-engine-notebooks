@@ -10,7 +10,8 @@ Reads <engine>/__marimo__/<engine>_notebook.ipynb, which marimo writes on save (
 images only work in the live editor (./@file/...); that HTML is dropped so every viewer shows the picture.
 
 Refuses a run that is incomplete, failed or older than the notebook (see check_runs.py), and leaves the static
-.ipynb alone. An engine with no saved run on this machine is skipped; CI still checks it.
+.ipynb alone. With no engine named, an engine with no saved run on this machine is skipped; CI still checks
+it. Under the hook, or when named, a notebook with no saved run is an error.
 
 Staging is deliberate: git re-reads the index after pre-commit hooks run, so the static .ipynb joins the commit being
 made. To keep source and outputs together, a notebook's .ipynb is built only when the file on disk is exactly what is
@@ -54,6 +55,10 @@ for notebook in targets:
     src, dst = saved_run(notebook), static_ipynb(notebook)
     rel, nb_rel = dst.relative_to(ROOT).as_posix(), notebook.relative_to(ROOT).as_posix()
     if not src.exists():
+        if HOOK or sys.argv[1:]:  # a notebook being committed, or named on the command line, needs its run
+            print(f"✗ no saved run for {nb_rel}, so {rel} was not written: check the notebook sets"
+                  f' auto_download=["ipynb"] in marimo.App(...), then run every cell and save it in the editor.')
+            failed = True
         continue
     index = git("show", f":{nb_rel}")
     if index.returncode != 0 or index.stdout != notebook.read_text():
