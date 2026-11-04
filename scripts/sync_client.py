@@ -11,8 +11,9 @@ are visible to every cell without being passed in; client.py imports its modules
 `_requests`, ...), so a notebook imports whatever it uses itself, exactly as it will once the setup cell is
 `from moth_atlas import ...`. A missing MOTH_API_KEY is reported by the helpers themselves on the first call.
 
-The notebook needs only a `with app.setup(hide_code=True):` block to start from; its contents are replaced
-on every run.
+The generated block is a recommended start, not a requirement: only notebooks whose setup block begins with
+`# cell: client` (as the template's does) are kept in sync. A notebook that calls the API its own way, or has
+its own setup block, is left alone.
 """
 
 import ast
@@ -45,13 +46,16 @@ def generated():
 
 
 def sync(path):
+    # Returns the notebook with its generated client block refreshed, or unchanged if it doesn't use one.
     text = path.read_text()
     lines = text.splitlines()
     for node in ast.parse(text).body:
         if isinstance(node, ast.With) and "app.setup" in ast.unparse(node.items[0].context_expr):
+            if lines[node.lineno].strip() != "# cell: client":
+                return text
             lines[node.lineno - 1:node.end_lineno] = generated().splitlines()
             return "\n".join(lines) + "\n"
-    sys.exit(f"{path.relative_to(ROOT)}: `with app.setup(hide_code=True):` block not found")
+    return text
 
 
 def main():

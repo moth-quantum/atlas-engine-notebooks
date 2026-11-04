@@ -151,6 +151,7 @@ def _(mo):
 def _():
     # cell: engine
     # upload, submit, wait and download: the Moth API helpers, from the hidden block at the top.
+    # Use them as below, or call the API your own way.
     ENGINE_ID = "TODO-v1"
     INPUT_SLOT = "TODO"  # the engine's input slot name
 

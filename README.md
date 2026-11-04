@@ -50,17 +50,17 @@ python scripts/check_runs.py <engine>
 
 ## How the notebooks are built
 
-- **Shared helpers.** [`client.py`](client.py) defines `upload`, `submit`, `wait` and `download`. `scripts/sync_client.py` copies it into each notebook's hidden `with app.setup` block (`# cell: client`), so every notebook runs on its own; don't edit that block by hand. It provides only those helpers and `AUTORUN`, so import everything else your cells use in the notebook's `setup` cell.
+- **Shared helpers.** [`client.py`](client.py) defines `upload`, `submit`, `wait` and `download`. `scripts/sync_client.py` copies it into each notebook's hidden `with app.setup` block (`# cell: client`), so every notebook runs on its own. It's a recommended start, not a requirement: use the helpers, or call the Moth API your own way. In a notebook that keeps the generated block, don't edit it by hand; it provides only those helpers and `AUTORUN`, so import everything else your cells use in the notebook's `setup` cell.
 - **Saved run.** With `auto_download=["ipynb"]`, the marimo editor writes the notebook and its outputs to `<engine>/__marimo__/<engine>_notebook.ipynb` on every save (git-ignored). `scripts/snapshot.py`, run by the commit hook, refuses an incomplete or stale run and publishes it to `<engine>/outputs/<engine>_notebook.ipynb` without the HTML that only works in the editor, so GitHub and Atlas show every image and nothing re-runs to render. Don't edit the published file; `scripts/check_runs.py` checks it in CI.
 - **No secrets.** No credentials, tokens or private hostnames in any file.
 
 ## Notebook format
 
-Atlas renders each engine's **Notebook** page from these files, so every notebook follows the same format. The template already does; keep it when you edit.
+CI requires only two things: the file's location (1) and an up-to-date saved run (9). Everything else is the recommended format: the template follows it, Atlas's **Notebook** page reads best with it, and it keeps the notebooks consistent for readers.
 
 1. **File.** `<engine>/<engine>_notebook.py`, a plain marimo file with a PEP 723 dependency header, `app_title` set to the engine's display name and `auto_download=["ipynb"]`.
-2. **Generated client.** One hidden `with app.setup` block (`# cell: client`), written by `scripts/sync_client.py`. It defines only `upload`, `submit`, `wait`, `download` and `AUTORUN`.
-3. **Cell ids.** Every `@app.cell` body starts with `# cell: <id>`: lowercase letters, digits and `-`, unique, and kept stable once published.
+2. **API client (optional).** The template's hidden `with app.setup` block (`# cell: client`), generated from `client.py`, defines `upload`, `submit`, `wait`, `download` and `AUTORUN`, and its `engine` cell shows how to call the API with them. Keep it, or replace it with your own calls.
+3. **Cell ids (recommended).** Start each `@app.cell` body with `# cell: <id>`, using lowercase letters, digits and `-`. Atlas uses them to tell cells apart, so keep them unique and stable once published.
 4. **Standard cells**, in this order: `setup` (imports), `intro`, `try-md`, the engine cell, inputs, `params`, `run`, `parameters`, `how`, `experiments-md` and the experiments, `questions`. Engine-specific helper cells (Blur's `display-helpers`) go just before the cell that first uses them, with their code hidden. Each experiment is a `<name>-md` text cell, a `<name>-params` cell (values and run button) and a `<name>` result cell.
 5. **Markdown.** A markdown cell is a single `mo.md(r"""…""")` call. No title line, since the page already has one; sections are `##`, subsections `###`. Formulas use `$…$` and `$$…$$`.
 6. **Parameters.** `params` holds one `mo.ui` control per engine parameter, plus the run button. `run` sends them as a dict of `"name": control.value` pairs, and the `parameters` cell documents each one (type, default, effect).

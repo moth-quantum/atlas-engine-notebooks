@@ -7,7 +7,6 @@
 The published run is <engine>/outputs/<engine>_notebook.ipynb: the run marimo saved in __marimo__/ after the author
 ran the notebook with their own key, cleaned by scripts/snapshot.py (the pre-commit hook runs it). It fails when:
 
-- a cell has no valid `# cell: <id>` marker (lowercase letters, digits and -), or an id is used twice;
 - the published run is missing, or still holds HTML that only works in the author's editor (./@file/ links);
 - the run is incomplete: a cell that displays something has no output, or still shows its "Press **Run …**" message;
 - the run is stale: a cell's code or a markdown cell differs from the notebook, so it was edited after the run was saved.
@@ -24,8 +23,7 @@ from marimo._ast.parse import parse_notebook
 
 ROOT = Path(__file__).resolve().parent.parent
 MARKER = re.compile(r"\s*# cell: (\S+)")
-VALID_ID = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
-MARKDOWN = re.compile(r'\s*# cell: \S+\s*\n\s*mo\.md\(r?"""(.*?)"""\)\s*', re.S)
+MARKDOWN = re.compile(r'\s*(?:# cell: \S+\s*\n)?\s*mo\.md\(r?"""(.*?)"""\)\s*', re.S)
 BANNER = "generated-banner"  # the markdown cell snapshot.py adds at the top of the published run
 FIX = "In the editor, run every cell and press each run button, then save and commit again."
 
@@ -69,38 +67,26 @@ def not_run(outputs):
 def check(notebook, run):
     """Problems with `run` (a saved or published .ipynb) as the run of `notebook`; empty when it's fine."""
     cells = parse_notebook(notebook.read_text()).cells
-    problems = []
-
-    ids = [cell_id(c.code) for c in cells]
-    for i, cid in enumerate(ids, 1):
-        if cid is None:
-            problems.append(f"cell {i} doesn't start with a `# cell: <id>` comment")
-        elif not VALID_ID.fullmatch(cid):
-            problems.append(f"cell id '{cid}' must use lowercase letters, digits and - only")
-    problems += [f"cell id '{cid}' is used twice" for cid in sorted({i for i in ids if i and ids.count(i) > 1})]
-    if problems:
-        return problems
-
     if not run.exists():
         return [f"no run at {run.relative_to(ROOT)}. {FIX}"]
     saved = json.loads(run.read_text())["cells"]
+    problems = []
 
-    code = {cell_id(c.code): c.code for c in cells if not MARKDOWN.fullmatch(c.code)}
-    saved_code = {}
-    for c in saved:
-        if c["cell_type"] == "code":
-            source = "".join(c["source"])
-            saved_code[cell_id(source)] = (source, c.get("outputs", []))
-    for cid, source in code.items():
-        if cid not in saved_code:
-            problems.append(f"{cid}: not in the saved run (added after it was saved)")
-        elif saved_code[cid][0] != source:
-            problems.append(f"{cid}: changed since the run was saved")
-        elif shows_output(source) and not saved_code[cid][1]:
-            problems.append(f"{cid}: no output in the saved run")
-        elif not_run(saved_code[cid][1]):
-            problems.append(f"{cid}: its run button wasn't pressed before saving")
-    problems += [f"{cid}: in the saved run but no longer in the notebook" for cid in saved_code if cid not in code]
+    # Code cells are compared in order, so `# cell:` ids are optional; they only make the messages clearer.
+    code = [c.code for c in cells if not MARKDOWN.fullmatch(c.code)]
+    saved_code = [("".join(c["source"]), c.get("outputs", [])) for c in saved if c["cell_type"] == "code"]
+    for i, source in enumerate(code, 1):
+        label = cell_id(source) or f"code cell {i}"
+        if i > len(saved_code):
+            problems.append(f"{label}: not in the saved run (added after it was saved)")
+        elif saved_code[i - 1][0] != source:
+            problems.append(f"{label}: changed since the run was saved")
+        elif shows_output(source) and not saved_code[i - 1][1]:
+            problems.append(f"{label}: no output in the saved run")
+        elif not_run(saved_code[i - 1][1]):
+            problems.append(f"{label}: its run button wasn't pressed before saving")
+    if len(saved_code) > len(code):
+        problems.append(f"the saved run has {len(saved_code) - len(code)} code cell(s) the notebook no longer has")
 
     markdown = [textwrap.dedent(MARKDOWN.fullmatch(c.code).group(1)).strip() for c in cells if MARKDOWN.fullmatch(c.code)]
     saved_markdown = ["".join(c["source"]).strip() for c in saved if c["cell_type"] == "markdown" and c.get("id") != BANNER]
