@@ -1,6 +1,6 @@
 .venv/
 __pycache__/
-# marimo's working folder; scripts/snapshot.py publishes the saved run from it to <engine>/outputs/.
+# marimo's working folder; scripts/build_ipynb.py builds the static .ipynb in <engine>/outputs/ from it.
 __marimo__/
 *.ipynb_checkpoints
 blur/outputs/*.html

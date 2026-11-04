@@ -2,9 +2,11 @@
 
 [marimo](https://marimo.io) notebooks for the engines on [Atlas](https://platform.mothquantum.com), Moth Quantum's platform. Each notebook runs an engine through the public Moth API and explains what it does. Atlas reads these notebooks to render each engine's **Notebook** page, and **Fork** on that page gives you your own copy of the same file.
 
-| engine | notebook | saved run |
+| engine | notebook | static notebook |
 |---|---|---|
 | `blur-v1` | [`blur/blur_notebook.py`](blur/blur_notebook.py) | [`blur/outputs/blur_notebook.ipynb`](blur/outputs/blur_notebook.ipynb) |
+| `coin-toss-v1` | [`coin_toss/coin_toss_notebook.py`](coin_toss/coin_toss_notebook.py) | [`coin_toss/outputs/coin_toss_notebook.ipynb`](coin_toss/outputs/coin_toss_notebook.ipynb) |
+| `telablur-v1` | [`telablur/telablur_notebook.py`](telablur/telablur_notebook.py) | [`telablur/outputs/telablur_notebook.ipynb`](telablur/outputs/telablur_notebook.ipynb) |
 
 ## Run a notebook
 
@@ -34,7 +36,6 @@ Nothing is submitted until you press a run button.
 |---|---|---|
 | `MOTH_API_KEY` | none | API key (required to run jobs) |
 | `MOTH_API_BASE` | `https://api.mothquantum.com` | point at a staging API or a mock |
-| `MOTH_AUTORUN` | unset | `1` runs every cell without pressing buttons, for a quick headless check (`python <engine>/<engine>_notebook.py`); it submits real jobs |
 
 ## Write a notebook for your engine
 
@@ -52,11 +53,25 @@ The hook generates a renderable `.ipynb` of your saved results for GitHub and At
 
 ### Create your notebook
 
-Copy the template into your engine's folder and put any sample inputs beside it. Follow the `TODO`s, or use the [Blur notebook](blur/blur_notebook.py) as a complete example.
+`<engine>` is the engine's name in snake_case without its version, e.g. `coin_toss` for `coin-toss-v1` (see [Notebook format](#notebook-format)).
+
+Pick the template for your kind of engine:
+
+| template | input | output shown as | finished example |
+|---|---|---|---|
+| [`1_core_engine`](templates/1_core_engine.py) | parameters + arrays / JSON | JSON, and a table for the sweep | [Coin Toss](coin_toss/coin_toss_notebook.py) |
+| [`2_image_engine`](templates/2_image_engine.py) | an image + parameters | a before/after slider, and a gallery for the sweep | [Blur](blur/blur_notebook.py), [Teleblur](telablur/telablur_notebook.py) (two images) |
+| [`3_audio_engine`](templates/3_audio_engine.py) | audio + parameters | before and after players | |
+| [`4_asset_engine`](templates/4_asset_engine.py) | parameters | a download button, and a preview tab per file | |
+| [`5_generative_engine`](templates/5_generative_engine.py) | an example to train on, then parameters to generate | the trained model to download, and the generated sequence | |
+
+For example, Coin Toss started from the core template:
 
 ```bash
-mkdir <engine> && cp templates/engine_notebook.py <engine>/<engine>_notebook.py
+mkdir coin_toss && cp templates/1_core_engine.py coin_toss/coin_toss_notebook.py
 ```
+
+Then fill in every `TODO` from the engine's docs, and put any sample inputs beside the notebook.
 
 ### Write, run and save
 
@@ -74,31 +89,26 @@ Stage your notebook, sample inputs, a short `<engine>/README.md` and a row in th
 
 The hook checks your saved results and adds the renderable `.ipynb` to the commit automatically. If a cell needs attention, it tells you which one: fix it in marimo, save, and commit again. CI runs the same checks on every pull request.
 
-Not using the hook? Publish the results yourself before committing:
+Not using the hook? Build the `.ipynb` yourself before committing:
 
 ```bash
-git add <engine>/<engine>_notebook.py && python scripts/snapshot.py <engine>
+git add <engine>/<engine>_notebook.py && python scripts/build_ipynb.py <engine>
 ```
-
-## How the notebooks are built
-
-- **Shared helpers.** [`client.py`](client.py) defines `upload`, `submit`, `wait` and `download`. `scripts/sync_client.py` copies it into each notebook's hidden `with app.setup` block (`# cell: client`), so every notebook runs on its own. It's a recommended start, not a requirement: use the helpers, or call the Moth API your own way. In a notebook that keeps the generated block, don't edit it by hand; it provides only those helpers and `AUTORUN`, so import everything else your cells use in the regular `# cell: setup` cell, not in the `with app.setup` block.
-- **Saved run.** With `auto_download=["ipynb"]`, the marimo editor writes the notebook and its outputs to `<engine>/__marimo__/<engine>_notebook.ipynb` on every save (git-ignored). `scripts/snapshot.py`, run by the commit hook (or by hand), refuses an incomplete or stale run and publishes it to `<engine>/outputs/<engine>_notebook.ipynb` without the HTML that only works in the editor, so GitHub and Atlas show every image and nothing re-runs to render. Don't edit the published file; `scripts/check_runs.py` checks it in CI.
-- **No secrets.** No credentials, tokens or private hostnames in any file.
 
 ## Notebook format
 
-CI requires only two things: the file's location (1) and an up-to-date saved run (9). Everything else is the recommended format: the template follows it, Atlas's **Notebook** page reads best with it, and it keeps the notebooks consistent for readers.
+CI requires only two things: the file's location (1) and an up-to-date static notebook (9). Everything else is the recommended format: the template follows it, Atlas's **Notebook** page reads best with it, and it keeps the notebooks consistent for readers.
 
-1. **File.** `<engine>/<engine>_notebook.py`, a plain marimo file with a PEP 723 dependency header (in `--sandbox` mode marimo adds packages to it for you when you install them from the editor), `app_title` set to the engine's display name and `auto_download=["ipynb"]`.
-2. **API client (optional).** The template's hidden `with app.setup` block (`# cell: client`), generated from `client.py`, defines `upload`, `submit`, `wait`, `download` and `AUTORUN`, and its `engine` cell shows how to call the API with them. Keep it, or replace it with your own calls.
-3. **Cell ids (recommended).** Start each `@app.cell` body with `# cell: <id>`, using lowercase letters, digits and `-`. Atlas uses them to tell cells apart, so keep them unique and stable once published. marimo can also name a cell by its function (`def params(...)`), but Atlas reads the `# cell:` comment, so use that.
+1. **File.** `<engine>/<engine>_notebook.py`, where `<engine>` is the engine's name in snake_case without its version: `blur-v1` → `blur/blur_notebook.py`, `deep-fryer-v1` → `deep_fryer/deep_fryer_notebook.py`. Engines that work as a pair share one folder named after the family (`qrc-train-v2` and `qrc-gen-v2` → `qrc/qrc_notebook.py`). It's a plain marimo file with a PEP 723 dependency header (in `--sandbox` mode marimo adds packages to it for you when you install them from the editor), `app_title` set to the engine's display name and `auto_download=["ipynb"]`.
+2. **API client (optional).** The template's hidden `with app.setup` block (`# cell: client`) defines `upload`, `submit`, `wait` and `download`, and its `engine` cell shows how to call the API with them. Keep it, or call the API your own way. The block is generated from [`client.py`](client.py) by `scripts/sync_client.py`, so edit `client.py`, not the block. It provides only those helpers: import everything else in the regular `# cell: setup` cell.
+3. **Cell ids (recommended).** Start each `@app.cell` body with `# cell: <id>`, using lowercase letters, digits and `-`. Atlas uses them to tell cells apart, so keep them unique and stable once merged. marimo can also name a cell by its function (`def params(...)`), but Atlas reads the `# cell:` comment, so use that.
 4. **Standard cells**, in this order: `setup` (imports), `intro`, `try-md`, the engine cell, inputs, `params`, `run`, `parameters`, `how`, `experiments-md` and the experiments, `questions`. Engine-specific helper cells (Blur's `display-helpers`) go just before the cell that first uses them, with their code hidden (`@app.cell(hide_code=True)`). Each experiment is a `<name>-md` text cell, a `<name>-params` cell (values and run button) and a `<name>` result cell.
 5. **Markdown.** A markdown cell is a single `mo.md(r"""…""")` call. No title line, since the page already has one; sections are `##`, subsections `###`. Formulas use `$…$` and `$$…$$`.
 6. **Parameters.** `params` is a `mo.ui.dictionary` keyed by the engine's parameter names, one control each, next to the run button. `run` sends `params.value` as it is, and the `parameters` cell documents each one (type, default, effect).
 7. **Questions.** `mo.md("## Questions")` plus `mo.accordion({...})` of `"question": "answer"` string pairs.
-8. **No surprise jobs.** Nothing calls the API until a run button is pressed (`mo.stop(not (button.value or AUTORUN), …)`), and reader-facing text stays about the science and the results.
-9. **Saved run.** `<engine>/outputs/<engine>_notebook.ipynb` is committed with every change to the notebook, complete and matching its code (see "Saved run").
+8. **No surprise jobs.** Nothing calls the API until a run button is pressed (`mo.stop(not button.value, …)`), and reader-facing text stays about the science and the results.
+9. **Static notebook.** `<engine>/outputs/<engine>_notebook.ipynb` is committed with every change to the notebook. `scripts/build_ipynb.py` builds it from your saved run (which marimo writes to `<engine>/__marimo__/` on every save, git-ignored): complete, matching the code, and without the HTML that only works in the editor, so GitHub and Atlas show every image without re-running anything. Don't edit it by hand.
+10. **No secrets.** No credentials, tokens or private hostnames in any file.
 
 ## License
 

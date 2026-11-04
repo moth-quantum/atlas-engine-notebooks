@@ -18,8 +18,8 @@ jobs:
       - name: Generated client is up to date
         run: python scripts/sync_client.py --check
       - name: Notebooks pass marimo check
-        run: marimo check */*_notebook.py
+        run: marimo check */*_notebook.py templates/*.py
       - name: Saved runs are complete and match the notebooks
         run: python scripts/check_runs.py
-      - name: Commit hook keeps each published run with its notebook
-        run: python scripts/test_snapshot.py
+      - name: Commit hook keeps each .ipynb with its notebook
+        run: python scripts/test_build_ipynb.py

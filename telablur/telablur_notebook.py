@@ -3,23 +3,22 @@
 # dependencies = [
 #     "marimo>=0.25",
 #     "requests>=2.31",
-#     # TODO: add the packages your own cells import
 # ]
 # ///
-
-# Template for a new engine notebook: copy it to <engine>/<engine>_notebook.py and fill in every TODO.
-# Then run every cell with your key, press each run button, save, and commit (the hook publishes the run).
-# Finished example: blur/blur_notebook.py
 
 import marimo
 
 __generated_with = "0.25.2"
-app = marimo.App(width="medium", app_title="TODO Engine name", auto_download=["ipynb"])
+app = marimo.App(
+    width="medium",
+    app_title="Quantum Teleblur",
+    auto_download=["ipynb"],
+)
 
 with app.setup(hide_code=True):
     # cell: client
     # Shared scaffolding, generated from client.py by scripts/sync_client.py: edit client.py, not this block.
-    # Only the public helpers and AUTORUN are visible to other cells; import any module you use in your own cells.
+    # Only the public helpers are visible to other cells; import any module you use in your own cells.
     # Imported under private names so a notebook's setup cell exposes only the public helpers (and the module
     # names stay free for the notebook's own imports, as they would be with `from moth_atlas import ...`).
     import hashlib as _hashlib
@@ -114,9 +113,6 @@ with app.setup(hide_code=True):
         url = out.get("url") or _call("GET", f"/assets/{out['output_asset_id']}/download")["download_url"]
         return _presigned("GET", url).content
 
-    # Headless exports: run every cell without pressing buttons. (Own line: marimo drops a trailing comment on save.)
-    AUTORUN = _os.environ.get("MOTH_AUTORUN") == "1"
-
 
 @app.cell
 def _():
@@ -131,7 +127,7 @@ def _():
 def _(mo):
     # cell: intro
     mo.md(r"""
-    TODO: one or two sentences on what the engine does and what makes its output different.
+    Quantum Teleblur morphs one image into another through qubit rotations.
     """)
     return
 
@@ -142,7 +138,7 @@ def _(mo):
     mo.md(r"""
     ## Try it
 
-    Pick an input and the parameters, then press **Run**.
+    Drop a source and a target image (or leave them empty to use the samples), pick the parameters, then press **Run**.
     """)
     return
 
@@ -151,13 +147,11 @@ def _(mo):
 def _():
     # cell: engine
     # upload, submit, wait and download: the Moth API helpers, from the hidden block at the top.
-    # Use them as below, or call the API your own way.
-    ENGINE_ID = "TODO-v1"
-    INPUT_SLOT = "TODO"  # the engine's input slot name
+    ENGINE_ID = "telablur-v1"
 
-    def run_engine(params, file=None, filename=None):
-        """Run one job: upload the input, submit, wait, download. Returns file bytes, or a dict for JSON results."""
-        input_files = {INPUT_SLOT: upload(file, filename=filename)} if file else None
+    def run_engine(params, files):
+        """Run one job. files maps each input slot to its (bytes, filename); returns the output image's bytes."""
+        input_files = {slot: upload(data, filename=name) for slot, (data, name) in files.items()}
         job_id = submit(ENGINE_ID, params, input_files)
         wait(job_id)
         return download(job_id)
@@ -167,20 +161,41 @@ def _():
 
 @app.cell
 def _(mo):
-    # cell: input
-    # TODO: delete this cell, and its use below, if the engine takes no input file.
-    input_file = mo.ui.file(kind="area", label="Drop an input file here")
-    input_file
-    return (input_file,)
+    # cell: inputs
+    IMAGE_TYPES = [".png", ".jpg", ".jpeg", ".webp", ".tiff", ".bmp"]
+    SAMPLE1, SAMPLE2 = mo.notebook_dir() / "image1.png", mo.notebook_dir() / "image2.png"
+    picker1 = mo.ui.file(filetypes=IMAGE_TYPES, kind="area", label="Drop the source image here")
+    picker2 = mo.ui.file(filetypes=IMAGE_TYPES, kind="area", label="Drop the target image here")
+    mo.hstack([picker1, picker2], widths="equal")
+    return SAMPLE1, SAMPLE2, picker1, picker2
+
+
+@app.cell
+def _(SAMPLE1, SAMPLE2, mo, picker1, picker2):
+    # cell: images
+    # Each upload, or its sample when nothing is uploaded.
+    def pick(picker, sample):
+        return (picker.contents(), picker.name()) if picker.value else (sample.read_bytes(), sample.name)
+
+    image1_bytes, image1_name = pick(picker1, SAMPLE1)
+    image2_bytes, image2_name = pick(picker2, SAMPLE2)
+    files = {"image1": (image1_bytes, image1_name), "image2": (image2_bytes, image2_name)}
+    mo.hstack([
+        mo.image(image1_bytes, width=200, caption="image1 (source)"),
+        mo.image(image2_bytes, width=200, caption="image2 (target)"),
+    ], justify="start")
+    return files, image1_bytes, image2_bytes
 
 
 @app.cell
 def _(mo):
     # cell: params
     # Keys are the engine's parameter names, so params.value is the dict sent to the API.
-    # TODO: one control per parameter, with the engine's ranges and defaults.
     params = mo.ui.dictionary({
-        "TODO_param": mo.ui.slider(0, 1, step=0.05, value=0.5, label="TODO_param"),
+        "strength": mo.ui.slider(0, 1, step=0.05, value=0.5, label="Strength"),
+        "direction": mo.ui.dropdown(["full", "vertical", "horizontal"], value="full", label="Direction"),
+        "size": mo.ui.slider(8, 1024, step=8, value=1024, label="Size"),
+        "downscale": mo.ui.checkbox(value=True, label="Downscale"),
     })
     run = mo.ui.run_button(label="Run")
     mo.vstack([params.vstack(), run])
@@ -188,11 +203,15 @@ def _(mo):
 
 
 @app.cell
-def _(input_file, mo, params, run, run_engine):
+def _(files, image1_bytes, image2_bytes, mo, params, run, run_engine):
     # cell: run
-    mo.stop(not (run.value or AUTORUN), mo.md("Press **Run** to see the result."))
-    result = run_engine(params.value, input_file.contents(), input_file.name())
-    mo.image(result)  # TODO: show the output the way that suits the engine, e.g. mo.audio, mo.json, a chart
+    mo.stop(not run.value, mo.md("Press **Run** to see the result."))
+    result = run_engine(params.value, files)
+    mo.hstack([
+        mo.image(image1_bytes, width=200, caption="source"),
+        mo.image(result, width=200, caption="result"),
+        mo.image(image2_bytes, width=200, caption="target"),
+    ], justify="start")
     return
 
 
@@ -204,10 +223,17 @@ def _(mo):
 
     | name | type | default | what it does |
     |---|---|---|---|
-    | `TODO` (input file) | TODO: accepted formats | required | TODO |
-    | `TODO_param` | float, 0 to 1 | 0.5 | TODO |
+    | `image1` (input file) | PNG, JPEG, WebP, TIFF or BMP | required | The source image. It is morphed toward `image2`. |
+    | `image2` (input file) | PNG, JPEG, WebP, TIFF or BMP | required | The target image. It is resized to match `image1` if the dimensions differ. |
+    | `mask` (input file) | PNG, JPEG, WebP, TIFF or BMP | optional | Per-pixel strength of the effect: black keeps `image1` unchanged, white applies the full effect. If omitted, `image1`'s alpha channel is used. |
+    | `strength` | float, 0 to 1 | 0.5 | Strength of the teleportation effect. |
+    | `direction` | `full`, `vertical` or `horizontal` | `full` | Which qubits get the blur rotation: `full` rotates all pixel qubits; `vertical` and `horizontal` limit the blur to one axis. |
+    | `size` | integer, 8 to 1024 | 1024 | Pixel budget per pass: a region up to `size × size` pixels is teleported in a single pass. |
+    | `downscale` | boolean | true | If true, oversized regions are downscaled before teleport and upscaled back; if false, they are tiled into sub-images. |
+    | `mask_bin_size` | number, 0 to 100 | 4 | Mask quantisation step as a percentage of 255. |
+    | `mask_min_region` | integer, at least 1 | 16 | Minimum connected mask region size in pixels; smaller regions are discarded. |
 
-    **Returns:** TODO: what comes back.
+    **Returns:** the processed image.
     """)
     return
 
@@ -218,7 +244,7 @@ def _(mo):
     mo.md(r"""
     ## How it works
 
-    TODO: the method in a few short paragraphs: what goes in, what the circuit does, how the output is read back.
+    Both images are encoded into one quantum state on $n+1$ qubits: $n$ qubits for the pixels and one selector qubit that marks which image each amplitude belongs to. Rotating the selector qubit blends the two images at the amplitude level.
     """)
     return
 
@@ -236,34 +262,34 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    # cell: sweep-md
+    # cell: strength-md
     mo.md(r"""
-    ### TODO_param
+    ### Strength
 
-    TODO: what to look for as the value changes.
+    Strength of the teleportation effect, from `image1` unchanged at 0 to the full effect at 1.
     """)
     return
 
 
 @app.cell
 def _(mo):
-    # cell: sweep-params
+    # cell: strength-params
     # Edit the values, then press the button: one job per value.
-    SWEEP = (0.0, 0.5, 1.0)
-    run_sweep = mo.ui.run_button(label=f"Run sweep ({len(SWEEP)} jobs)")
-    run_sweep
-    return SWEEP, run_sweep
+    STRENGTHS = (0.0, 0.25, 0.5, 0.75, 1.0)
+    run_strength = mo.ui.run_button(label=f"Run sweep ({len(STRENGTHS)} jobs)")
+    run_strength
+    return STRENGTHS, run_strength
 
 
 @app.cell(hide_code=True)
-def _(SWEEP, input_file, mo, run_engine, run_sweep):
-    # cell: sweep
-    mo.stop(not (run_sweep.value or AUTORUN), mo.md("Press **Run sweep** to compare the values above."))
-    tiles = []
-    for value in SWEEP:
-        out = run_engine({"TODO_param": value}, input_file.contents(), input_file.name())
-        tiles.append(mo.vstack([mo.image(out), mo.md(f"`TODO_param = {value}`")]))
-    mo.hstack(tiles, wrap=True)
+def _(STRENGTHS, files, mo, params, run_engine, run_strength):
+    # cell: strength
+    mo.stop(not run_strength.value, mo.md("Press **Run sweep** to compare the values above."))
+    tiles = [
+        mo.image(run_engine({**params.value, "strength": s}, files), width=160, caption=f"strength = {s}")
+        for s in STRENGTHS
+    ]
+    mo.hstack(tiles, wrap=True, justify="start")
     return
 
 
@@ -271,7 +297,8 @@ def _(SWEEP, input_file, mo, run_engine, run_sweep):
 def _(mo):
     # cell: questions
     mo.vstack([mo.md("## Questions"), mo.accordion({
-        "TODO: a question new users ask?": "TODO: a short answer.",
+        "What if the two images are different sizes?": "image2 is resized to match image1.",
+        "Why did my run fail?": "A run still going after 18,000 s is cancelled and the job ends failed. Mismatched mask sizes and masks with no non-zero pixels are rejected.",
     })])
     return
 

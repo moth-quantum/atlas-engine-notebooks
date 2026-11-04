@@ -16,7 +16,7 @@ app = marimo.App(width="medium", app_title="Blur", auto_download=["ipynb"])
 with app.setup(hide_code=True):
     # cell: client
     # Shared scaffolding, generated from client.py by scripts/sync_client.py: edit client.py, not this block.
-    # Only the public helpers and AUTORUN are visible to other cells; import any module you use in your own cells.
+    # Only the public helpers are visible to other cells; import any module you use in your own cells.
     # Imported under private names so a notebook's setup cell exposes only the public helpers (and the module
     # names stay free for the notebook's own imports, as they would be with `from moth_atlas import ...`).
     import hashlib as _hashlib
@@ -110,9 +110,6 @@ with app.setup(hide_code=True):
             return res["result"]
         url = out.get("url") or _call("GET", f"/assets/{out['output_asset_id']}/download")["download_url"]
         return _presigned("GET", url).content
-
-    # Headless exports: run every cell without pressing buttons. (Own line: marimo drops a trailing comment on save.)
-    AUTORUN = _os.environ.get("MOTH_AUTORUN") == "1"
 
 
 @app.cell
@@ -243,7 +240,7 @@ def _(mo):
 @app.cell
 def _(blur, image_bytes, image_name, image_px, mo, np, params, row, run):
     # cell: run
-    mo.stop(not (run.value or AUTORUN), mo.md("Press **Run Blur** to blur the image with these settings."))
+    mo.stop(not run.value, mo.md("Press **Run Blur** to blur the image with these settings."))
     job_params = params.value
     blurred = blur(job_params, image_bytes, image_name)
     change = np.abs(blurred - image_px)
@@ -350,7 +347,7 @@ def _(
 ):
     # cell: strength
     mo.stop(
-        not (run_strength.value or AUTORUN),
+        not run_strength.value,
         mo.md("Press **Run strength sweep** to compare the strengths above."),
     )
     results = {
@@ -406,7 +403,7 @@ def _(
 ):
     # cell: reach
     mo.stop(
-        not (run_reach.value or AUTORUN),
+        not run_reach.value,
         mo.md("Press **Run reach and style sweep** to compare both gate styles across reach."),
     )
     rows = []
@@ -465,7 +462,7 @@ def _(
 ):
     # cell: mask
     mo.stop(
-        not (run_mask.value or AUTORUN),
+        not run_mask.value,
         mo.md("Press **Run mask experiment** to blur only inside the disc."),
     )
     yy, xx = np.mgrid[0:height, 0:width]
