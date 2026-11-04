@@ -28,7 +28,7 @@ Nothing is submitted until you press a run button.
 |---|---|---|
 | `MOTH_API_KEY` | none | API key (required to run jobs) |
 | `MOTH_API_BASE` | `https://api.mothquantum.com` | point at a staging API or a mock |
-| `MOTH_AUTORUN` | unset | `1` runs every cell without pressing buttons, for headless exports (`scripts/export.sh <engine>`) |
+| `MOTH_AUTORUN` | unset | `1` runs every cell without pressing buttons, for headless runs (e.g. `marimo export ipynb --include-outputs`) |
 
 ## Add an engine
 

@@ -8,6 +8,7 @@ The published run is <engine>/outputs/<engine>_notebook.ipynb: the run marimo sa
 ran the notebook with their own key, cleaned by scripts/snapshot.py (the pre-commit hook runs it). It fails when:
 
 - the published run is missing, or still holds HTML that only works in the author's editor (./@file/ links);
+- the run failed: a cell raised an error (an API error included);
 - the run is incomplete: a cell that displays something has no output, or still shows its "Press **Run …**" message;
 - the run is stale: a cell's code or a markdown cell differs from the notebook, so it was edited after the run was saved.
 """
@@ -81,6 +82,8 @@ def check(notebook, run):
             problems.append(f"{label}: not in the saved run (added after it was saved)")
         elif saved_code[i - 1][0] != source:
             problems.append(f"{label}: changed since the run was saved")
+        elif any(o.get("output_type") == "error" for o in saved_code[i - 1][1]):
+            problems.append(f"{label}: raised an error in the saved run")
         elif shows_output(source) and not saved_code[i - 1][1]:
             problems.append(f"{label}: no output in the saved run")
         elif not_run(saved_code[i - 1][1]):
