@@ -227,48 +227,31 @@ def _(Image, as_float, image_upload, io, math, mo, requests):
 @app.cell
 def _(mo):
     # cell: params
-    strength = mo.ui.slider(0, 1, step=0.05, value=0.5, label="Strength")
-    style = mo.ui.radio(options={"RX · spread": "rx", "RY · edges": "ry"}, value="RX · spread", label="Gate style")
-    reach = mo.ui.slider(0, 1, step=0.05, value=0.0, label="Reach")
-    size = mo.ui.slider(8, 1024, step=8, value=1024, label="Size")
-    downscale = mo.ui.checkbox(value=True, label="Downscale large regions")
+    # Keys are the engine's parameter names, so params.value is the dict sent to the API.
+    params = mo.ui.dictionary({
+        "strength": mo.ui.slider(0, 1, step=0.05, value=0.5, label="Strength"),
+        "style": mo.ui.radio(options={"RX · spread": "rx", "RY · edges": "ry"}, value="RX · spread", label="Gate style"),
+        "reach": mo.ui.slider(0, 1, step=0.05, value=0.0, label="Reach"),
+        "size": mo.ui.slider(8, 1024, step=8, value=1024, label="Size"),
+        "downscale": mo.ui.checkbox(value=True, label="Downscale large regions"),
+    })
     run = mo.ui.run_button(label="Run Blur")
-    mo.vstack([strength, style, reach, size, downscale, run])
-    return downscale, reach, run, size, strength, style
+    mo.vstack([params.vstack(), run])
+    return params, run
 
 
 @app.cell
-def _(
-    blur,
-    downscale,
-    image_bytes,
-    image_name,
-    image_px,
-    mo,
-    np,
-    reach,
-    row,
-    run,
-    size,
-    strength,
-    style,
-):
+def _(blur, image_bytes, image_name, image_px, mo, np, params, row, run):
     # cell: run
     mo.stop(not (run.value or AUTORUN), mo.md("Press **Run Blur** to blur the image with these settings."))
-    params = {
-        "strength": strength.value,
-        "style": style.value,
-        "reach": reach.value,
-        "size": size.value,
-        "downscale": downscale.value,
-    }
-    blurred = blur(params, image_bytes, image_name)
+    job_params = params.value
+    blurred = blur(job_params, image_bytes, image_name)
     change = np.abs(blurred - image_px)
     mo.vstack([
-        mo.md(f"`{params}` · mean |out − in| = {change.mean():.3f}"),
+        mo.md(f"`{job_params}` · mean |out − in| = {change.mean():.3f}"),
         row({
             "input": image_px,
-            f"{params['style']} · strength {params['strength']} · reach {params['reach']}": blurred,
+            f"{job_params['style']} · strength {job_params['strength']} · reach {job_params['reach']}": blurred,
             "|out − in|, brighter = changed more": change.mean(-1) / max(change.max(), 1e-6),
         }),
     ])

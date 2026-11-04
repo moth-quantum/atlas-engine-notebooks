@@ -177,19 +177,21 @@ def _(mo):
 @app.cell
 def _(mo):
     # cell: params
+    # Keys are the engine's parameter names, so params.value is the dict sent to the API.
     # TODO: one control per parameter, with the engine's ranges and defaults.
-    example_param = mo.ui.slider(0, 1, step=0.05, value=0.5, label="TODO_param")
+    params = mo.ui.dictionary({
+        "TODO_param": mo.ui.slider(0, 1, step=0.05, value=0.5, label="TODO_param"),
+    })
     run = mo.ui.run_button(label="Run")
-    mo.vstack([example_param, run])
-    return example_param, run
+    mo.vstack([params.vstack(), run])
+    return params, run
 
 
 @app.cell
-def _(example_param, input_file, mo, run, run_engine):
+def _(input_file, mo, params, run, run_engine):
     # cell: run
     mo.stop(not (run.value or AUTORUN), mo.md("Press **Run** to see the result."))
-    params = {"TODO_param": example_param.value}  # TODO: one "name": control.value pair per parameter
-    result = run_engine(params, input_file.contents(), input_file.name())
+    result = run_engine(params.value, input_file.contents(), input_file.name())
     mo.image(result)  # TODO: show the output the way that suits the engine, e.g. mo.audio, mo.json, a chart
     return
 
