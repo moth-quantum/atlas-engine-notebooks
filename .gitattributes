@@ -1,2 +1,2 @@
-# Static previews written by scripts/snapshot.py: collapsed in PR diffs, excluded from language stats.
-*/outputs/*.ipynb linguist-generated=true
+# Published runs written by scripts/snapshot.py: collapsed in PR diffs, excluded from language stats.
+*/outputs/*_notebook.ipynb linguist-generated=true

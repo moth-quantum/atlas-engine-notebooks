@@ -1,5 +1,7 @@
 .venv/
 __pycache__/
+# marimo's working folder; scripts/snapshot.py publishes the saved run from it to <engine>/outputs/.
 __marimo__/
 *.ipynb_checkpoints
 blur/outputs/*.html
+.DS_Store

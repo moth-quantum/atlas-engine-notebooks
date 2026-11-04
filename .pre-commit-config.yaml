@@ -1,0 +1,11 @@
+# One-time setup: `pre-commit install`. On every commit this publishes each notebook's saved run from __marimo__/
+# to outputs/ (scripts/snapshot.py). When it writes a file the commit stops once: `git add` it and commit again.
+repos:
+  - repo: local
+    hooks:
+      - id: snapshot
+        name: publish saved runs to outputs/
+        entry: python scripts/snapshot.py
+        language: system
+        pass_filenames: false
+        always_run: true  # __marimo__/ is git-ignored, so a fresh save never shows up as a staged file
