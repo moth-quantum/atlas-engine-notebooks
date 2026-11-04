@@ -5,6 +5,7 @@
 | engine | notebook | static notebook |
 |---|---|---|
 | `blur-v1` | [`blur/blur_notebook.py`](blur/blur_notebook.py) | [`blur/outputs/blur_notebook.ipynb`](blur/outputs/blur_notebook.ipynb) |
+| `coin-toss-v1` | [`coin_toss/coin_toss_notebook.py`](coin_toss/coin_toss_notebook.py) | [`coin_toss/outputs/coin_toss_notebook.ipynb`](coin_toss/outputs/coin_toss_notebook.ipynb) |
 
 ## Run a notebook
 
