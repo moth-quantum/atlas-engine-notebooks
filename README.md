@@ -16,7 +16,13 @@ export MOTH_API_KEY=...
 marimo edit blur/blur_notebook.py
 ```
 
-Or open it straight from GitHub, with its dependencies installed into an isolated environment:
+To try the engine without the code, open the app view instead: controls and results only.
+
+```bash
+marimo run blur/blur_notebook.py
+```
+
+Or open it straight from GitHub, with its dependencies installed into an isolated environment (needs [uv](https://docs.astral.sh/uv/)):
 
 ```bash
 marimo edit --sandbox https://raw.githubusercontent.com/moth-quantum/atlas-engine-notebooks/main/blur/blur_notebook.py
@@ -28,42 +34,66 @@ Nothing is submitted until you press a run button.
 |---|---|---|
 | `MOTH_API_KEY` | none | API key (required to run jobs) |
 | `MOTH_API_BASE` | `https://api.mothquantum.com` | point at a staging API or a mock |
-| `MOTH_AUTORUN` | unset | `1` runs every cell without pressing buttons, for headless runs (e.g. `marimo export ipynb --include-outputs`) |
+| `MOTH_AUTORUN` | unset | `1` runs every cell without pressing buttons, for a quick headless check (`python <engine>/<engine>_notebook.py`); it submits real jobs |
 
-## Add an engine
+## Write a notebook for your engine
 
-Once per clone, install the commit hook (`pre-commit` is in `requirements.txt`):
+Start from the template, add a working example and a few experiments, then run and save it in marimo. Readers can view your results on GitHub and Atlas, or fork the notebook to explore it themselves.
+
+### Set up once
+
+After installing the repository's dependencies (see [Run a notebook](#run-a-notebook)), enable the commit hook:
 
 ```bash
 pre-commit install
 ```
 
-1. **Copy.** Copy the template and fill in every `TODO`; [`blur/blur_notebook.py`](blur/blur_notebook.py) is a finished example. Put any sample inputs beside it.
-   ```bash
-   mkdir <engine> && cp templates/engine_notebook.py <engine>/<engine>_notebook.py
-   ```
-2. **Write and run.** With your own `MOTH_API_KEY`, open it in the editor, run every cell, press each run button, then save. Present the demo however you like with marimo's controls, images and layouts.
-   ```bash
-   marimo edit <engine>/<engine>_notebook.py
-   ```
-3. **Commit.** Commit the notebook, plus a short `<engine>/README.md` and a row in the table above, and open a pull request. The hook publishes your saved run as `<engine>/outputs/<engine>_notebook.ipynb` and adds it to the commit. If the run is incomplete, failed or out of date, it stops the commit and says which cell; fix it in the editor, save, and commit again.
+The hook generates a renderable `.ipynb` of your saved results for GitHub and Atlas, and includes it in your commit.
 
-After any change to the notebook, save it in the editor before committing. To check a run without committing, stage the notebook and run `python scripts/snapshot.py <engine>`; it refuses a notebook with unstaged changes, since the saved run may belong to them. The hook publishes only the notebooks in your commit, and it needs `pre-commit install`, so CI still runs the same checks, without an API key, on every pull request (plus `marimo check` and the generated client).
+### Create your notebook
+
+Copy the template into your engine's folder and put any sample inputs beside it. Follow the `TODO`s, or use the [Blur notebook](blur/blur_notebook.py) as a complete example.
+
+```bash
+mkdir <engine> && cp templates/engine_notebook.py <engine>/<engine>_notebook.py
+```
+
+### Write, run and save
+
+Explain what your engine does, expose its parameters, and include a few experiments that show their effects.
+
+```bash
+marimo edit <engine>/<engine>_notebook.py
+```
+
+Run every cell, press each run button, then save with Cmd/Ctrl+S. Pressing a button doesn't trigger marimo's autosave, so save after the last one. API jobs use your own Atlas API key (`MOTH_API_KEY`).
+
+### Submit your contribution
+
+Stage your notebook, sample inputs, a short `<engine>/README.md` and a row in the engine table above. Commit and open a pull request.
+
+The hook checks your saved results and adds the renderable `.ipynb` to the commit automatically. If a cell needs attention, it tells you which one: fix it in marimo, save, and commit again. CI runs the same checks on every pull request.
+
+Not using the hook? Publish the results yourself before committing:
+
+```bash
+git add <engine>/<engine>_notebook.py && python scripts/snapshot.py <engine>
+```
 
 ## How the notebooks are built
 
-- **Shared helpers.** [`client.py`](client.py) defines `upload`, `submit`, `wait` and `download`. `scripts/sync_client.py` copies it into each notebook's hidden `with app.setup` block (`# cell: client`), so every notebook runs on its own. It's a recommended start, not a requirement: use the helpers, or call the Moth API your own way. In a notebook that keeps the generated block, don't edit it by hand; it provides only those helpers and `AUTORUN`, so import everything else your cells use in the notebook's `setup` cell.
-- **Saved run.** With `auto_download=["ipynb"]`, the marimo editor writes the notebook and its outputs to `<engine>/__marimo__/<engine>_notebook.ipynb` on every save (git-ignored). `scripts/snapshot.py`, run by the commit hook, refuses an incomplete or stale run and publishes it to `<engine>/outputs/<engine>_notebook.ipynb` without the HTML that only works in the editor, so GitHub and Atlas show every image and nothing re-runs to render. Don't edit the published file; `scripts/check_runs.py` checks it in CI.
+- **Shared helpers.** [`client.py`](client.py) defines `upload`, `submit`, `wait` and `download`. `scripts/sync_client.py` copies it into each notebook's hidden `with app.setup` block (`# cell: client`), so every notebook runs on its own. It's a recommended start, not a requirement: use the helpers, or call the Moth API your own way. In a notebook that keeps the generated block, don't edit it by hand; it provides only those helpers and `AUTORUN`, so import everything else your cells use in the regular `# cell: setup` cell, not in the `with app.setup` block.
+- **Saved run.** With `auto_download=["ipynb"]`, the marimo editor writes the notebook and its outputs to `<engine>/__marimo__/<engine>_notebook.ipynb` on every save (git-ignored). `scripts/snapshot.py`, run by the commit hook (or by hand), refuses an incomplete or stale run and publishes it to `<engine>/outputs/<engine>_notebook.ipynb` without the HTML that only works in the editor, so GitHub and Atlas show every image and nothing re-runs to render. Don't edit the published file; `scripts/check_runs.py` checks it in CI.
 - **No secrets.** No credentials, tokens or private hostnames in any file.
 
 ## Notebook format
 
 CI requires only two things: the file's location (1) and an up-to-date saved run (9). Everything else is the recommended format: the template follows it, Atlas's **Notebook** page reads best with it, and it keeps the notebooks consistent for readers.
 
-1. **File.** `<engine>/<engine>_notebook.py`, a plain marimo file with a PEP 723 dependency header, `app_title` set to the engine's display name and `auto_download=["ipynb"]`.
+1. **File.** `<engine>/<engine>_notebook.py`, a plain marimo file with a PEP 723 dependency header (in `--sandbox` mode marimo adds packages to it for you when you install them from the editor), `app_title` set to the engine's display name and `auto_download=["ipynb"]`.
 2. **API client (optional).** The template's hidden `with app.setup` block (`# cell: client`), generated from `client.py`, defines `upload`, `submit`, `wait`, `download` and `AUTORUN`, and its `engine` cell shows how to call the API with them. Keep it, or replace it with your own calls.
-3. **Cell ids (recommended).** Start each `@app.cell` body with `# cell: <id>`, using lowercase letters, digits and `-`. Atlas uses them to tell cells apart, so keep them unique and stable once published.
-4. **Standard cells**, in this order: `setup` (imports), `intro`, `try-md`, the engine cell, inputs, `params`, `run`, `parameters`, `how`, `experiments-md` and the experiments, `questions`. Engine-specific helper cells (Blur's `display-helpers`) go just before the cell that first uses them, with their code hidden. Each experiment is a `<name>-md` text cell, a `<name>-params` cell (values and run button) and a `<name>` result cell.
+3. **Cell ids (recommended).** Start each `@app.cell` body with `# cell: <id>`, using lowercase letters, digits and `-`. Atlas uses them to tell cells apart, so keep them unique and stable once published. marimo can also name a cell by its function (`def params(...)`), but Atlas reads the `# cell:` comment, so use that.
+4. **Standard cells**, in this order: `setup` (imports), `intro`, `try-md`, the engine cell, inputs, `params`, `run`, `parameters`, `how`, `experiments-md` and the experiments, `questions`. Engine-specific helper cells (Blur's `display-helpers`) go just before the cell that first uses them, with their code hidden (`@app.cell(hide_code=True)`). Each experiment is a `<name>-md` text cell, a `<name>-params` cell (values and run button) and a `<name>` result cell.
 5. **Markdown.** A markdown cell is a single `mo.md(r"""…""")` call. No title line, since the page already has one; sections are `##`, subsections `###`. Formulas use `$…$` and `$$…$$`.
 6. **Parameters.** `params` is a `mo.ui.dictionary` keyed by the engine's parameter names, one control each, next to the run button. `run` sends `params.value` as it is, and the `parameters` cell documents each one (type, default, effect).
 7. **Questions.** `mo.md("## Questions")` plus `mo.accordion({...})` of `"question": "answer"` string pairs.

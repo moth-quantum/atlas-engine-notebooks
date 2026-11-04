@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "marimo>=0.17",
+#     "marimo>=0.25",
 #     "requests>=2.31",
 #     # TODO: add the packages your own cells import
 # ]

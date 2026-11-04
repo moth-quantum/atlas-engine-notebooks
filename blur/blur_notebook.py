@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "marimo>=0.17",
+#     "marimo>=0.25",
 #     "numpy>=1.26",
 #     "pillow>=10",
 #     "requests>=2.31",

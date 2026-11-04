@@ -5,7 +5,7 @@
     python scripts/check_runs.py blur       # one engine
 
 The published run is <engine>/outputs/<engine>_notebook.ipynb: the run marimo saved in __marimo__/ after the author
-ran the notebook with their own key, cleaned by scripts/snapshot.py (the pre-commit hook runs it). It fails when:
+ran the notebook with their own key, cleaned and published by scripts/snapshot.py (by hand, or the optional commit hook). It fails when:
 
 - the published run is missing, or still holds HTML that only works in the author's editor (./@file/ links);
 - the run failed: a cell raised an error (an API error included);
@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MARKER = re.compile(r"\s*# cell: (\S+)")
 MARKDOWN = re.compile(r'\s*(?:# cell: \S+\s*\n)?\s*mo\.md\(r?"""(.*?)"""\)\s*', re.S)
 BANNER = "generated-banner"  # the markdown cell snapshot.py adds at the top of the published run
-FIX = "In the editor, run every cell and press each run button, then save and commit again."
+FIX = "In the editor, run every cell and press each run button, then save."
 
 
 def notebooks(engines):
@@ -111,6 +111,8 @@ def main():
         print(f"{'✗' if problems else '✓'} {notebook.relative_to(ROOT)}")
         for p in problems:
             print(f"    {p}")
+        if problems:
+            print(f"    Then publish the run: `python scripts/snapshot.py {notebook.parent.name}` (see the README's Write a notebook for your engine).")
         failed |= bool(problems)
     sys.exit(1 if failed else 0)
 
