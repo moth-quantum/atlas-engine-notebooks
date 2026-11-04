@@ -1,0 +1,23 @@
+# Checks every engine notebook and its committed saved run. Needs no API key and runs no jobs.
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  notebooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Generated client is up to date
+        run: python scripts/sync_client.py --check
+      - name: Notebooks pass marimo check
+        run: marimo check */*_notebook.py
+      - name: Saved runs are complete and match the notebooks
+        run: python scripts/check_runs.py

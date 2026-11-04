@@ -8,6 +8,7 @@
 # ///
 
 # Template for a new engine notebook: copy it to <engine>/<engine>_notebook.py and fill in every TODO.
+# Then run every cell with your key, press each run button, save, and commit this file with <engine>/__marimo__/.
 # Finished example: blur/blur_notebook.py
 
 import marimo

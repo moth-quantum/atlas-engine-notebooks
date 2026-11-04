@@ -2,9 +2,9 @@
 
 [marimo](https://marimo.io) notebooks for the engines on [Atlas](https://platform.mothquantum.com), Moth Quantum's platform. Each notebook runs an engine through the public Moth API and explains what it does. Atlas reads these notebooks to render each engine's **Notebook** page, and **Fork** on that page gives you your own copy of the same file.
 
-| engine | notebook | static preview |
+| engine | notebook | saved run |
 |---|---|---|
-| `blur-v1` | [`blur/blur_notebook.py`](blur/blur_notebook.py) | [`blur/outputs/blur_notebook.ipynb`](blur/outputs/blur_notebook.ipynb) |
+| `blur-v1` | [`blur/blur_notebook.py`](blur/blur_notebook.py) | [`blur/__marimo__/blur_notebook.ipynb`](blur/__marimo__/blur_notebook.ipynb) |
 
 ## Run a notebook
 
@@ -32,18 +32,20 @@ Nothing is submitted until you press a run button.
 
 ## Add an engine
 
-Copy [`templates/engine_notebook.py`](templates/engine_notebook.py) to `<engine>/<engine>_notebook.py` and fill in every `TODO`; [`blur/blur_notebook.py`](blur/blur_notebook.py) is a finished example. Before opening a pull request, check that:
+1. **Copy and write.** Copy [`templates/engine_notebook.py`](templates/engine_notebook.py) to `<engine>/<engine>_notebook.py`, put any sample inputs beside it, and fill in every `TODO`; [`blur/blur_notebook.py`](blur/blur_notebook.py) is a finished example. Present the demo however you like with marimo's controls, images and layouts.
+2. **Run and save.** In `marimo edit`, with your own `MOTH_API_KEY`, run every cell, press each run button, then save. marimo writes `<engine>/__marimo__/<engine>_notebook.ipynb`: the saved run, with its outputs, that Atlas shows.
+3. **Commit.** Commit the notebook and its saved run together, plus a short `<engine>/README.md` and a row in the table above, and open a pull request.
 
-- [ ] the notebook is in its own folder, `<engine>/`, with any sample inputs beside it
-- [ ] no `TODO` is left, and the header lists every package the notebook imports
-- [ ] `marimo check <engine>/<engine>_notebook.py` and `python scripts/sync_client.py --check` both pass
-- [ ] the static preview is refreshed: press every run button in the editor, save, then run `python scripts/snapshot.py <engine>`
-- [ ] `<engine>/README.md` says in a few lines what the engine does, and the engine has a row in the table above
+CI checks every pull request without an API key: the generated client is up to date, `marimo check` passes, and the saved run is complete and matches the notebook. If you change the notebook, run it and save again before committing. To check before you push:
+
+```bash
+python scripts/check_runs.py <engine>
+```
 
 ## How the notebooks are built
 
 - **Shared helpers.** [`client.py`](client.py) defines `upload`, `submit`, `wait` and `download`. `scripts/sync_client.py` copies it into each notebook's hidden `with app.setup` block (`# cell: client`), so every notebook runs on its own; don't edit that block by hand. It provides only those helpers and `AUTORUN`, so import everything else your cells use in the notebook's `setup` cell.
-- **Static preview.** With `auto_download=["ipynb"]`, the marimo editor saves the notebook with its outputs to `<engine>/__marimo__/` on every save. `scripts/snapshot.py` copies it to `<engine>/outputs/` for GitHub to render; don't edit that copy.
+- **Saved run.** With `auto_download=["ipynb"]`, the marimo editor writes the notebook and its outputs to `<engine>/__marimo__/<engine>_notebook.ipynb` on every save. That file is committed (the rest of `__marimo__/` is ignored) and is what Atlas renders, so nothing re-runs to show a notebook. Don't edit it by hand; `scripts/check_runs.py` checks it in CI.
 - **No secrets.** No credentials, tokens or private hostnames in any file.
 
 ## Notebook format
@@ -58,7 +60,7 @@ Atlas renders each engine's **Notebook** page from these files, so every noteboo
 6. **Parameters.** `params` holds one `mo.ui` control per engine parameter, plus the run button. `run` sends them as a dict of `"name": control.value` pairs, and the `parameters` cell documents each one (type, default, effect).
 7. **Questions.** `mo.md("## Questions")` plus `mo.accordion({...})` of `"question": "answer"` string pairs.
 8. **No surprise jobs.** Nothing calls the API until a run button is pressed (`mo.stop(not (button.value or AUTORUN), …)`), and reader-facing text stays about the science and the results.
-9. **Saved outputs.** `<engine>/outputs/<engine>_notebook.ipynb` is the notebook's saved run (see "Static preview").
+9. **Saved run.** `<engine>/__marimo__/<engine>_notebook.ipynb` is committed with every change to the notebook, complete and matching its code (see "Saved run").
 
 ## License
 

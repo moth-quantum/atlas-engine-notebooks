@@ -1,6 +1,9 @@
 .venv/
 __pycache__/
-__marimo__/
+# marimo's working folder: only the saved run (<engine>/__marimo__/<engine>_notebook.ipynb) is committed.
+**/__marimo__/*
+!**/__marimo__/*_notebook.ipynb
+templates/__marimo__/*
 *.ipynb_checkpoints
 blur/outputs/*.html
 .DS_Store
