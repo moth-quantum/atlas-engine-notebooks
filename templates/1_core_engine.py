@@ -7,9 +7,9 @@
 # ]
 # ///
 
-# Template for generative engines: train a model from an example, then generate from it.
+# Template for core engines: parameters (or a numeric array) in, a JSON result out.
 # Copy it to <engine>/<engine>_notebook.py and fill in every TODO. Run every cell with your key, press each run
-# button, save, and commit: the hook publishes the run.
+# button, save, and commit: the hook builds the static .ipynb.
 
 import marimo
 
@@ -122,10 +122,8 @@ with app.setup(hide_code=True):
 def _():
     # cell: setup
     # Import every module your cells use here; the hidden block at the top provides only the API helpers.
-    import json
-
     import marimo as mo
-    return json, mo
+    return (mo,)
 
 
 @app.cell(hide_code=True)
@@ -143,55 +141,24 @@ def _(mo):
     mo.md(r"""
     ## Try it
 
-    Enter an example and press **Train**, then generate from the trained model as often as you like.
+    Set the parameters, then press **Run**.
     """)
     return
 
 
 @app.cell
-def _(json):
+def _():
     # cell: engine
     # upload, submit, wait and download: the Moth API helpers, from the hidden block at the top.
-    # One engine trains a model file, the other generates from it: train once, generate many.
-    TRAIN_ENGINE = "TODO-train-v1"
-    GENERATE_ENGINE = "TODO-gen-v1"
-    MODEL_SLOT = "TODO"  # the slot that carries the model, out of training and into generation
+    ENGINE_ID = "TODO-v1"
 
-    def train(params):
-        """Train a model; returns the model file's bytes."""
-        job_id = submit(TRAIN_ENGINE, params)
+    def run_engine(params):
+        """Run one job; returns its JSON result as a dict."""
+        job_id = submit(ENGINE_ID, params)
         wait(job_id)
-        return download(job_id, MODEL_SLOT)
+        return download(job_id)
 
-    def generate(model, params):
-        """Generate from a trained model; returns what it generated."""
-        job_id = submit(GENERATE_ENGINE, params, {MODEL_SLOT: upload(model, "application/json", "model.json")})
-        wait(job_id)
-        return json.loads(download(job_id, MODEL_SLOT))["TODO"]  # TODO: where the engine puts its output
-
-    return generate, train
-
-
-@app.cell
-def _(mo):
-    # cell: train-params
-    # TODO: the example to learn from, and the training parameters, keyed by the engine's names.
-    example = mo.ui.text_area(value="TODO example", label="Example", full_width=True)
-    train_params = mo.ui.dictionary({
-        "TODO_param": mo.ui.slider(1, 100, value=10, label="TODO_param"),
-    })
-    run_train = mo.ui.run_button(label="Train")
-    mo.vstack([example, train_params.vstack(), run_train])
-    return example, run_train, train_params
-
-
-@app.cell
-def _(example, mo, run_train, train, train_params):
-    # cell: train
-    mo.stop(not (run_train.value or AUTORUN), mo.md("Press **Train** to see the result."))
-    model = train({**train_params.value, "TODO": example.value.split()})  # TODO: the example's parameter name
-    mo.download(model, filename="model.json", label="Download the trained model")
-    return (model,)
+    return (run_engine,)
 
 
 @app.cell
@@ -202,17 +169,17 @@ def _(mo):
     params = mo.ui.dictionary({
         "TODO_param": mo.ui.slider(0, 1, step=0.05, value=0.5, label="TODO_param"),
     })
-    run = mo.ui.run_button(label="Generate")
+    run = mo.ui.run_button(label="Run")
     mo.vstack([params.vstack(), run])
     return params, run
 
 
 @app.cell
-def _(generate, mo, model, params, run):
-    # cell: generate
-    # Runs only once a model is trained.
-    mo.stop(not (run.value or AUTORUN), mo.md("Press **Generate** to see the result."))
-    mo.md(" ".join(f"`{t}`" for t in generate(model, params.value)))
+def _(mo, params, run, run_engine):
+    # cell: run
+    mo.stop(not (run.value or AUTORUN), mo.md("Press **Run** to see the result."))
+    result = run_engine(params.value)
+    mo.json(result)  # TODO: show the fields that matter, e.g. mo.stat cards or a chart
     return
 
 
@@ -224,7 +191,6 @@ def _(mo):
 
     | name | type | default | what it does |
     |---|---|---|---|
-    | `TODO` (train) | the example to learn from | required | TODO |
     | `TODO_param` | float, 0 to 1 | 0.5 | TODO |
 
     **Returns:** TODO: what comes back.
@@ -276,10 +242,10 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(SWEEP, generate, mo, model, params, run_sweep):
+def _(SWEEP, mo, params, run_engine, run_sweep):
     # cell: sweep
     mo.stop(not (run_sweep.value or AUTORUN), mo.md("Press **Run sweep** to compare the values above."))
-    rows = [{"TODO_param": v, "generated": generate(model, {**params.value, "TODO_param": v})} for v in SWEEP]
+    rows = [{"TODO_param": v, **run_engine({**params.value, "TODO_param": v})} for v in SWEEP]
     mo.ui.table(rows, selection=None)
     return
 

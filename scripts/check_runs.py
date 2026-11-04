@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Check each engine notebook's published run (the file Atlas and GitHub render). Runs in CI; needs no API key.
+"""Check each engine notebook's static .ipynb (the file Atlas and GitHub render). Runs in CI; needs no API key.
 
     python scripts/check_runs.py            # every <engine>/<engine>_notebook.py
     python scripts/check_runs.py blur       # one engine
 
-The published run is <engine>/outputs/<engine>_notebook.ipynb: the run marimo saved in __marimo__/ after the author
-ran the notebook with their own key, cleaned and published by scripts/snapshot.py (by hand, or the optional commit hook). It fails when:
+The static .ipynb is <engine>/outputs/<engine>_notebook.ipynb: the run marimo saved in __marimo__/ after the author
+ran the notebook with their own key, cleaned and built by scripts/build_ipynb.py (by hand, or the optional commit hook). It fails when:
 
-- the published run is missing, or still holds HTML that only works in the author's editor (./@file/ links);
+- the .ipynb is missing, or still holds HTML that only works in the author's editor (./@file/ links);
 - the run failed: a cell raised an error (an API error included);
 - the run is incomplete: a cell that displays something has no output, or still shows its "Press **Run …**" message;
 - the run is stale: a cell's code or a markdown cell differs from the notebook, so it was edited after the run was saved.
@@ -25,7 +25,7 @@ from marimo._ast.parse import parse_notebook
 ROOT = Path(__file__).resolve().parent.parent
 MARKER = re.compile(r"\s*# cell: (\S+)")
 MARKDOWN = re.compile(r'\s*(?:# cell: \S+\s*\n)?\s*mo\.md\(r?"""(.*?)"""\)\s*', re.S)
-BANNER = "generated-banner"  # the markdown cell snapshot.py adds at the top of the published run
+BANNER = "generated-banner"  # the markdown cell build_ipynb.py adds at the top of the .ipynb
 FIX = "In the editor, run every cell and press each run button, then save."
 
 
@@ -42,7 +42,7 @@ def saved_run(notebook):
     return notebook.parent / "__marimo__" / f"{notebook.stem}.ipynb"
 
 
-def published_run(notebook):
+def static_ipynb(notebook):
     return notebook.parent / "outputs" / f"{notebook.stem}.ipynb"
 
 
@@ -66,7 +66,7 @@ def not_run(outputs):
 
 
 def check(notebook, run):
-    """Problems with `run` (a saved or published .ipynb) as the run of `notebook`; empty when it's fine."""
+    """Problems with `run` (a saved run or a static .ipynb) as the run of `notebook`; empty when it's fine."""
     cells = parse_notebook(notebook.read_text()).cells
     if not run.exists():
         return [f"no run at {run.relative_to(ROOT)}. {FIX}"]
@@ -104,15 +104,15 @@ def check(notebook, run):
 def main():
     failed = False
     for notebook in notebooks(sys.argv[1:]):
-        run = published_run(notebook)
+        run = static_ipynb(notebook)
         problems = check(notebook, run)
         if not problems and "./@file/" in run.read_text():
-            problems = [f"{run.relative_to(ROOT)} has links to the author's editor; run `python scripts/snapshot.py {notebook.parent.name}`"]
+            problems = [f"{run.relative_to(ROOT)} has links to the author's editor; run `python scripts/build_ipynb.py {notebook.parent.name}`"]
         print(f"{'✗' if problems else '✓'} {notebook.relative_to(ROOT)}")
         for p in problems:
             print(f"    {p}")
         if problems:
-            print(f"    Then publish the run: `python scripts/snapshot.py {notebook.parent.name}` (see the README's Write a notebook for your engine).")
+            print(f"    Then build the .ipynb: `python scripts/build_ipynb.py {notebook.parent.name}` (see the README's Write a notebook for your engine).")
         failed |= bool(problems)
     sys.exit(1 if failed else 0)
 

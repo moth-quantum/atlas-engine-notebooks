@@ -7,9 +7,9 @@
 # ]
 # ///
 
-# Template for game and render asset engines: parameters in, a downloadable asset out.
+# Template for image engines: an image in, an image out.
 # Copy it to <engine>/<engine>_notebook.py and fill in every TODO. Run every cell with your key, press each run
-# button, save, and commit: the hook publishes the run.
+# button, save, and commit: the hook builds the static .ipynb. Finished example: blur/blur_notebook.py
 
 import marimo
 
@@ -122,11 +122,8 @@ with app.setup(hide_code=True):
 def _():
     # cell: setup
     # Import every module your cells use here; the hidden block at the top provides only the API helpers.
-    import io
-    import zipfile
-
     import marimo as mo
-    return io, mo, zipfile
+    return (mo,)
 
 
 @app.cell(hide_code=True)
@@ -144,38 +141,48 @@ def _(mo):
     mo.md(r"""
     ## Try it
 
-    Set the parameters, then press **Generate**. Preview the asset here, or download it.
+    Drop an image (or leave it empty to use the sample), pick the parameters, then press **Run**.
     """)
     return
 
 
 @app.cell
-def _(io, mo, zipfile):
+def _():
     # cell: engine
     # upload, submit, wait and download: the Moth API helpers, from the hidden block at the top.
     ENGINE_ID = "TODO-v1"
-    ASSET_NAME = "TODO.zip"  # the filename readers download
+    INPUT_SLOT = "TODO"  # the engine's input slot name
 
-    def run_engine(params):
-        """Run one job; returns the asset file's bytes."""
-        job_id = submit(ENGINE_ID, params)
+    def run_engine(params, input_bytes, input_name):
+        """Run one job on the input file; returns the output file's bytes."""
+        job_id = submit(ENGINE_ID, params, {INPUT_SLOT: upload(input_bytes, filename=input_name)})
         wait(job_id)
         return download(job_id)
 
-    def preview(asset):
-        """One tab per file in the asset (a zip, or a single file): images shown, text in a code viewer."""
-        z = zipfile.ZipFile(io.BytesIO(asset)) if zipfile.is_zipfile(io.BytesIO(asset)) else None
-        files = {n: z.read(n) for n in z.namelist() if not n.endswith("/")} if z else {ASSET_NAME: asset}
-        def show(name, data):
-            if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
-                return mo.image(data, width=320)
-            try:
-                return mo.ui.code_editor(data.decode(), disabled=True)
-            except UnicodeDecodeError:
-                return mo.md(f"{len(data):,} bytes, no preview")
-        return mo.ui.tabs({name: show(name, data) for name, data in files.items()})
+    return (run_engine,)
 
-    return ASSET_NAME, preview, run_engine
+
+@app.cell
+def _(mo):
+    # cell: input
+    # TODO: put a small sample beside the notebook, so it runs without an upload.
+    SAMPLE = mo.notebook_dir() / "TODO_sample.png"
+    picker = mo.ui.file(filetypes=[".png", ".jpg", ".jpeg", ".webp"], kind="area", label="Drop an image here")
+    picker
+    return SAMPLE, picker
+
+
+@app.cell
+def _(SAMPLE, mo, picker):
+    # cell: image
+    # The upload, or the sample when nothing is uploaded.
+    mo.stop(not (picker.value or SAMPLE.exists()), mo.md(f"Drop an image above, or add `{SAMPLE.name}` beside the notebook."))
+    if picker.value:
+        input_bytes, input_name = picker.contents(), picker.name()
+    else:
+        input_bytes, input_name = SAMPLE.read_bytes(), SAMPLE.name
+    mo.image(input_bytes, width=240, caption=input_name)
+    return input_bytes, input_name
 
 
 @app.cell
@@ -186,17 +193,17 @@ def _(mo):
     params = mo.ui.dictionary({
         "TODO_param": mo.ui.slider(0, 1, step=0.05, value=0.5, label="TODO_param"),
     })
-    run = mo.ui.run_button(label="Generate")
+    run = mo.ui.run_button(label="Run")
     mo.vstack([params.vstack(), run])
     return params, run
 
 
 @app.cell
-def _(ASSET_NAME, mo, params, preview, run, run_engine):
+def _(input_bytes, input_name, mo, params, run, run_engine):
     # cell: run
-    mo.stop(not (run.value or AUTORUN), mo.md("Press **Generate** to see the result."))
-    asset = run_engine(params.value)
-    mo.vstack([mo.download(asset, filename=ASSET_NAME), preview(asset)])
+    mo.stop(not (run.value or AUTORUN), mo.md("Press **Run** to see the result."))
+    result = run_engine(params.value, input_bytes, input_name)
+    mo.image_compare(input_bytes, result, width=480)  # drag the divider to compare
     return
 
 
@@ -208,6 +215,7 @@ def _(mo):
 
     | name | type | default | what it does |
     |---|---|---|---|
+    | `TODO` (input file) | TODO: accepted formats | required | TODO |
     | `TODO_param` | float, 0 to 1 | 0.5 | TODO |
 
     **Returns:** TODO: what comes back.
@@ -259,11 +267,11 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(ASSET_NAME, SWEEP, mo, params, preview, run_engine, run_sweep):
+def _(SWEEP, input_bytes, input_name, mo, params, run_engine, run_sweep):
     # cell: sweep
     mo.stop(not (run_sweep.value or AUTORUN), mo.md("Press **Run sweep** to compare the values above."))
-    assets = {f"TODO_param = {v}": run_engine({**params.value, "TODO_param": v}) for v in SWEEP}
-    mo.ui.tabs({k: mo.vstack([mo.download(a, filename=ASSET_NAME), preview(a)]) for k, a in assets.items()})
+    tiles = [mo.image(run_engine({**params.value, "TODO_param": v}, input_bytes, input_name), width=200, caption=f"TODO_param = {v}") for v in SWEEP]
+    mo.hstack(tiles, wrap=True, justify="start")
     return
 
 

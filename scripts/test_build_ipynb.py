@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Check that the commit hook (scripts/snapshot.py) keeps each published run with the notebook source it belongs to.
+"""Check that the commit hook (scripts/build_ipynb.py) keeps each static .ipynb with the notebook source it belongs to.
 
-    python scripts/test_snapshot.py
+    python scripts/test_build_ipynb.py
 
 Builds a throwaway repo from this checkout's scripts and Blur, adds a second engine, installs the hook, and commits:
 a full commit, a partial one (staged notebook A, unstaged edits B with B's run), an unrelated commit, two engines with
-newer runs where only one is committed, a manual publish with unstaged edits, and a run with an error. A saved run is
-rebuilt from the published one, so no API key or editor is needed.
+newer runs where only one is committed, a manual build with unstaged edits, and a run with an error. A saved run is
+rebuilt from the static .ipynb, so no API key or editor is needed.
 """
 
 import json
@@ -54,7 +54,7 @@ def edit(engine, tag, notebook=True, run=True):
 
 
 def restore(engine, **metadata):
-    """Make the saved run match what HEAD published again (optionally marked as a newer run of the same notebook)."""
+    """Make the saved run match HEAD's static .ipynb again (optionally marked as a newer run of the same notebook)."""
     data = json.loads(head(f"{engine}/outputs/{engine}_notebook.ipynb"))
     data["cells"] = [c for c in data["cells"] if c.get("id") != "generated-banner"]
     data["metadata"].update(metadata)
@@ -76,7 +76,7 @@ try:
     shutil.copytree(REPO / "blur", REPO / "two")
     for f in (REPO / "two").rglob("blur_notebook.*"):
         f.rename(f.with_name(f.name.replace("blur", "two")))
-    # Saved runs, rebuilt from the published runs (drop the banner snapshot.py adds).
+    # Saved runs, rebuilt from the static .ipynb files (drop the banner build_ipynb.py adds).
     for engine in ["blur", "two"]:
         data = json.loads((REPO / engine / "outputs" / f"{engine}_notebook.ipynb").read_text())
         data["cells"] = [c for c in data["cells"] if c.get("id") != "generated-banner"]
@@ -88,22 +88,22 @@ try:
     (REPO / "notes.md").write_text("notes\n")
     sh("git", "init", "-q")
     sh("git", "add", "-A")
-    sh("python", "scripts/snapshot.py")  # publish both engines with the banner, as the hook would
+    sh("python", "scripts/build_ipynb.py")  # build both engines with the banner, as the hook would
     sh("git", "commit", "-qm", "base", "--no-verify")
     sh("pre-commit", "install")
     BLUR, TWO = "blur/outputs/blur_notebook.ipynb", "two/outputs/two_notebook.ipynb"
 
     edit("blur", " (A)")
     sh("git", "add", "blur/blur_notebook.py")
-    check("full commit: passes and carries the new published run", commit("A") and in_head(BLUR) and " (A)" in head(BLUR))
+    check("full commit: passes and carries the new .ipynb", commit("A") and in_head(BLUR) and " (A)" in head(BLUR))
 
     edit("blur", " (B)")  # author runs B and stages it...
     sh("git", "add", "blur/blur_notebook.py")
     edit("blur", " (C)")  # ...then edits and runs C without staging: the saved run is a valid run of C
     check("partial commit (run belongs to unstaged edits): blocked", not commit("B"))
     check("partial commit: nothing committed", " (B)" not in head("blur/blur_notebook.py"))
-    check("manual publish with unstaged edits: refused, nothing staged",
-          sh("python", "scripts/snapshot.py", "blur", ok=False).returncode == 1 and
+    check("manual build with unstaged edits: refused, nothing staged",
+          sh("python", "scripts/build_ipynb.py", "blur", ok=False).returncode == 1 and
           sh("git", "diff", "--cached", "--name-only").stdout.split() == ["blur/blur_notebook.py"])
     sh("git", "reset", "-q", "--hard")
     restore("blur")
@@ -111,14 +111,14 @@ try:
     edit("two", " (D)")  # a newer run of an engine this commit doesn't touch, with unstaged edits
     (REPO / "notes.md").write_text("notes 2\n")
     sh("git", "add", "notes.md")
-    check("unrelated commit: passes and touches no published run",
+    check("unrelated commit: passes and touches no .ipynb",
           commit("notes") and sh("git", "show", "--name-only", "--format=", "HEAD").stdout.split() == ["notes.md"])
 
     sh("git", "checkout", "-q", "--", "two/two_notebook.py")
     restore("two", newer=True)  # two: a newer, valid run of an unchanged notebook
     edit("blur", " (E)")
     sh("git", "add", "blur/blur_notebook.py")
-    check("two engines with newer runs, one committed: only that one is published",
+    check("two engines with newer runs, one committed: only that one is built",
           commit("E") and in_head(BLUR) and not in_head(TWO) and '"newer"' not in head(TWO))
 
     saved = REPO / "blur" / "__marimo__" / "blur_notebook.ipynb"

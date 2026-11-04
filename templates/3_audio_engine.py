@@ -7,9 +7,9 @@
 # ]
 # ///
 
-# Template for image engines: an image in, an image out.
+# Template for audio engines: audio in, audio out.
 # Copy it to <engine>/<engine>_notebook.py and fill in every TODO. Run every cell with your key, press each run
-# button, save, and commit: the hook publishes the run. Finished example: blur/blur_notebook.py
+# button, save, and commit: the hook builds the static .ipynb.
 
 import marimo
 
@@ -141,7 +141,7 @@ def _(mo):
     mo.md(r"""
     ## Try it
 
-    Drop an image (or leave it empty to use the sample), pick the parameters, then press **Run**.
+    Drop an audio file (or leave it empty to use the sample), pick the parameters, then press **Run**.
     """)
     return
 
@@ -166,22 +166,22 @@ def _():
 def _(mo):
     # cell: input
     # TODO: put a small sample beside the notebook, so it runs without an upload.
-    SAMPLE = mo.notebook_dir() / "TODO_sample.png"
-    picker = mo.ui.file(filetypes=[".png", ".jpg", ".jpeg", ".webp"], kind="area", label="Drop an image here")
+    SAMPLE = mo.notebook_dir() / "TODO_sample.wav"
+    picker = mo.ui.file(filetypes=[".wav", ".mp3", ".flac", ".ogg"], kind="area", label="Drop an audio file here")
     picker
     return SAMPLE, picker
 
 
 @app.cell
 def _(SAMPLE, mo, picker):
-    # cell: image
+    # cell: audio
     # The upload, or the sample when nothing is uploaded.
-    mo.stop(not (picker.value or SAMPLE.exists()), mo.md(f"Drop an image above, or add `{SAMPLE.name}` beside the notebook."))
+    mo.stop(not (picker.value or SAMPLE.exists()), mo.md(f"Drop an audio file above, or add `{SAMPLE.name}` beside the notebook."))
     if picker.value:
         input_bytes, input_name = picker.contents(), picker.name()
     else:
         input_bytes, input_name = SAMPLE.read_bytes(), SAMPLE.name
-    mo.image(input_bytes, width=240, caption=input_name)
+    mo.audio(input_bytes)
     return input_bytes, input_name
 
 
@@ -203,7 +203,7 @@ def _(input_bytes, input_name, mo, params, run, run_engine):
     # cell: run
     mo.stop(not (run.value or AUTORUN), mo.md("Press **Run** to see the result."))
     result = run_engine(params.value, input_bytes, input_name)
-    mo.image_compare(input_bytes, result, width=480)  # drag the divider to compare
+    mo.hstack([mo.vstack([mo.md("**Before**"), mo.audio(input_bytes)]), mo.vstack([mo.md("**After**"), mo.audio(result)])], justify="start")
     return
 
 
@@ -270,7 +270,7 @@ def _(mo):
 def _(SWEEP, input_bytes, input_name, mo, params, run_engine, run_sweep):
     # cell: sweep
     mo.stop(not (run_sweep.value or AUTORUN), mo.md("Press **Run sweep** to compare the values above."))
-    tiles = [mo.image(run_engine({**params.value, "TODO_param": v}, input_bytes, input_name), width=200, caption=f"TODO_param = {v}") for v in SWEEP]
+    tiles = [mo.vstack([mo.md(f"`TODO_param = {v}`"), mo.audio(run_engine({**params.value, "TODO_param": v}, input_bytes, input_name))]) for v in SWEEP]
     mo.hstack(tiles, wrap=True, justify="start")
     return
 

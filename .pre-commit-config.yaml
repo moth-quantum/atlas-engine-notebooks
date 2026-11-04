@@ -1,11 +1,11 @@
-# One-time setup: `pre-commit install`. On every commit this publishes each notebook's latest saved run to outputs/
-# and stages it (scripts/snapshot.py), so it joins the commit. A run that is incomplete, failed or stale blocks the commit.
+# One-time setup: `pre-commit install`. On every commit this builds each notebook's static .ipynb in outputs/ from
+# its latest saved run and stages it (scripts/build_ipynb.py), so it joins the commit. A run that is incomplete, failed or stale blocks the commit.
 repos:
   - repo: local
     hooks:
-      - id: snapshot
-        name: publish saved runs to outputs/
-        entry: python scripts/snapshot.py
+      - id: build-ipynb
+        name: build static .ipynb from saved runs
+        entry: python scripts/build_ipynb.py
         language: system
         pass_filenames: false
         always_run: true  # __marimo__/ is git-ignored, so a fresh save never shows up as a staged file

@@ -1,2 +1,2 @@
-# Published runs written by scripts/snapshot.py: collapsed in PR diffs, excluded from language stats.
+# Static .ipynb files built by scripts/build_ipynb.py: collapsed in PR diffs, excluded from language stats.
 */outputs/*_notebook.ipynb linguist-generated=true

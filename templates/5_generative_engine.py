@@ -7,9 +7,9 @@
 # ]
 # ///
 
-# Template for audio engines: audio in, audio out.
+# Template for generative engines: train a model from an example, then generate from it.
 # Copy it to <engine>/<engine>_notebook.py and fill in every TODO. Run every cell with your key, press each run
-# button, save, and commit: the hook publishes the run.
+# button, save, and commit: the hook builds the static .ipynb.
 
 import marimo
 
@@ -122,8 +122,10 @@ with app.setup(hide_code=True):
 def _():
     # cell: setup
     # Import every module your cells use here; the hidden block at the top provides only the API helpers.
+    import json
+
     import marimo as mo
-    return (mo,)
+    return json, mo
 
 
 @app.cell(hide_code=True)
@@ -141,48 +143,55 @@ def _(mo):
     mo.md(r"""
     ## Try it
 
-    Drop an audio file (or leave it empty to use the sample), pick the parameters, then press **Run**.
+    Enter an example and press **Train**, then generate from the trained model as often as you like.
     """)
     return
 
 
 @app.cell
-def _():
+def _(json):
     # cell: engine
     # upload, submit, wait and download: the Moth API helpers, from the hidden block at the top.
-    ENGINE_ID = "TODO-v1"
-    INPUT_SLOT = "TODO"  # the engine's input slot name
+    # One engine trains a model file, the other generates from it: train once, generate many.
+    TRAIN_ENGINE = "TODO-train-v1"
+    GENERATE_ENGINE = "TODO-gen-v1"
+    MODEL_SLOT = "TODO"  # the slot that carries the model, out of training and into generation
 
-    def run_engine(params, input_bytes, input_name):
-        """Run one job on the input file; returns the output file's bytes."""
-        job_id = submit(ENGINE_ID, params, {INPUT_SLOT: upload(input_bytes, filename=input_name)})
+    def train(params):
+        """Train a model; returns the model file's bytes."""
+        job_id = submit(TRAIN_ENGINE, params)
         wait(job_id)
-        return download(job_id)
+        return download(job_id, MODEL_SLOT)
 
-    return (run_engine,)
+    def generate(model, params):
+        """Generate from a trained model; returns what it generated."""
+        job_id = submit(GENERATE_ENGINE, params, {MODEL_SLOT: upload(model, "application/json", "model.json")})
+        wait(job_id)
+        return json.loads(download(job_id, MODEL_SLOT))["TODO"]  # TODO: where the engine puts its output
+
+    return generate, train
 
 
 @app.cell
 def _(mo):
-    # cell: input
-    # TODO: put a small sample beside the notebook, so it runs without an upload.
-    SAMPLE = mo.notebook_dir() / "TODO_sample.wav"
-    picker = mo.ui.file(filetypes=[".wav", ".mp3", ".flac", ".ogg"], kind="area", label="Drop an audio file here")
-    picker
-    return SAMPLE, picker
+    # cell: train-params
+    # TODO: the example to learn from, and the training parameters, keyed by the engine's names.
+    example = mo.ui.text_area(value="TODO example", label="Example", full_width=True)
+    train_params = mo.ui.dictionary({
+        "TODO_param": mo.ui.slider(1, 100, value=10, label="TODO_param"),
+    })
+    run_train = mo.ui.run_button(label="Train")
+    mo.vstack([example, train_params.vstack(), run_train])
+    return example, run_train, train_params
 
 
 @app.cell
-def _(SAMPLE, mo, picker):
-    # cell: audio
-    # The upload, or the sample when nothing is uploaded.
-    mo.stop(not (picker.value or SAMPLE.exists()), mo.md(f"Drop an audio file above, or add `{SAMPLE.name}` beside the notebook."))
-    if picker.value:
-        input_bytes, input_name = picker.contents(), picker.name()
-    else:
-        input_bytes, input_name = SAMPLE.read_bytes(), SAMPLE.name
-    mo.audio(input_bytes)
-    return input_bytes, input_name
+def _(example, mo, run_train, train, train_params):
+    # cell: train
+    mo.stop(not (run_train.value or AUTORUN), mo.md("Press **Train** to see the result."))
+    model = train({**train_params.value, "TODO": example.value.split()})  # TODO: the example's parameter name
+    mo.download(model, filename="model.json", label="Download the trained model")
+    return (model,)
 
 
 @app.cell
@@ -193,17 +202,17 @@ def _(mo):
     params = mo.ui.dictionary({
         "TODO_param": mo.ui.slider(0, 1, step=0.05, value=0.5, label="TODO_param"),
     })
-    run = mo.ui.run_button(label="Run")
+    run = mo.ui.run_button(label="Generate")
     mo.vstack([params.vstack(), run])
     return params, run
 
 
 @app.cell
-def _(input_bytes, input_name, mo, params, run, run_engine):
-    # cell: run
-    mo.stop(not (run.value or AUTORUN), mo.md("Press **Run** to see the result."))
-    result = run_engine(params.value, input_bytes, input_name)
-    mo.hstack([mo.vstack([mo.md("**Before**"), mo.audio(input_bytes)]), mo.vstack([mo.md("**After**"), mo.audio(result)])], justify="start")
+def _(generate, mo, model, params, run):
+    # cell: generate
+    # Runs only once a model is trained.
+    mo.stop(not (run.value or AUTORUN), mo.md("Press **Generate** to see the result."))
+    mo.md(" ".join(f"`{t}`" for t in generate(model, params.value)))
     return
 
 
@@ -215,7 +224,7 @@ def _(mo):
 
     | name | type | default | what it does |
     |---|---|---|---|
-    | `TODO` (input file) | TODO: accepted formats | required | TODO |
+    | `TODO` (train) | the example to learn from | required | TODO |
     | `TODO_param` | float, 0 to 1 | 0.5 | TODO |
 
     **Returns:** TODO: what comes back.
@@ -267,11 +276,11 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(SWEEP, input_bytes, input_name, mo, params, run_engine, run_sweep):
+def _(SWEEP, generate, mo, model, params, run_sweep):
     # cell: sweep
     mo.stop(not (run_sweep.value or AUTORUN), mo.md("Press **Run sweep** to compare the values above."))
-    tiles = [mo.vstack([mo.md(f"`TODO_param = {v}`"), mo.audio(run_engine({**params.value, "TODO_param": v}, input_bytes, input_name))]) for v in SWEEP]
-    mo.hstack(tiles, wrap=True, justify="start")
+    rows = [{"TODO_param": v, "generated": generate(model, {**params.value, "TODO_param": v})} for v in SWEEP]
+    mo.ui.table(rows, selection=None)
     return
 
 

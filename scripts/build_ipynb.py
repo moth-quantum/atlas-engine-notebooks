@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Publish each engine notebook's saved run as the file Atlas and GitHub render. The pre-commit hook runs it on every
+"""Build each engine notebook's static .ipynb, the file Atlas and GitHub render, from its saved run. The pre-commit hook runs it on every
 commit, so authors don't need to; run it by hand to check a run before committing.
 
-    python scripts/snapshot.py blur         # one engine: validate, write outputs/, git add
-    python scripts/snapshot.py              # every engine with a saved run on this machine
+    python scripts/build_ipynb.py blur         # one engine: validate, write outputs/, git add
+    python scripts/build_ipynb.py              # every engine with a saved run on this machine
 
 Reads <engine>/__marimo__/<engine>_notebook.ipynb, which marimo writes on save (auto_download=["ipynb"]), and writes
 <engine>/outputs/<engine>_notebook.ipynb. marimo stores each output as a PNG picture plus, for some cells, HTML whose
 images only work in the live editor (./@file/...); that HTML is dropped so every viewer shows the picture.
 
-Refuses a run that is incomplete, failed or older than the notebook (see check_runs.py), and leaves the published
-file alone. An engine with no saved run on this machine is skipped; CI still checks it.
+Refuses a run that is incomplete, failed or older than the notebook (see check_runs.py), and leaves the static
+.ipynb alone. An engine with no saved run on this machine is skipped; CI still checks it.
 
-Staging is deliberate: git re-reads the index after pre-commit hooks run, so the published file joins the commit being
-made. To keep source and outputs together, a notebook is published only when the file on disk is exactly what is
+Staging is deliberate: git re-reads the index after pre-commit hooks run, so the static .ipynb joins the commit being
+made. To keep source and outputs together, a notebook's .ipynb is built only when the file on disk is exactly what is
 staged (else the saved run may belong to unstaged edits), and under the hook only notebooks staged in this commit are
-published. pre-commit stashes unstaged edits before the hook runs, so there a run that belongs to them fails the
-staleness check instead. scripts/test_snapshot.py covers these cases.
+built. pre-commit stashes unstaged edits before the hook runs, so there a run that belongs to them fails the
+staleness check instead. scripts/test_build_ipynb.py covers these cases.
 """
 
 import json
@@ -24,7 +24,7 @@ import os
 import subprocess
 import sys
 
-from check_runs import ROOT, check, notebooks, published_run, saved_run
+from check_runs import ROOT, check, notebooks, static_ipynb, saved_run
 
 HOOK = bool(os.environ.get("PRE_COMMIT"))
 
@@ -33,13 +33,13 @@ def git(*args):
     return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
 
 
-def published(src, notebook):
+def build(src, notebook):
     nb = json.loads(src.read_text())
     for cell in nb["cells"]:
         for out in cell.get("outputs", []):
             if "image/png" in out.get("data", {}):
                 out["data"].pop("text/html", None)
-    banner = f"> **Generated** from [`{notebook.name}`](../{notebook.name}) by `scripts/snapshot.py`: don't edit this file."
+    banner = f"> **Generated** from [`{notebook.name}`](../{notebook.name}) by `scripts/build_ipynb.py`: don't edit this file."
     nb["cells"].insert(0, {"cell_type": "markdown", "id": "generated-banner", "metadata": {}, "source": banner})
     return json.dumps(nb, indent=1, ensure_ascii=False) + "\n"
 
@@ -51,7 +51,7 @@ if HOOK:
 
 failed = False
 for notebook in targets:
-    src, dst = saved_run(notebook), published_run(notebook)
+    src, dst = saved_run(notebook), static_ipynb(notebook)
     rel, nb_rel = dst.relative_to(ROOT).as_posix(), notebook.relative_to(ROOT).as_posix()
     if not src.exists():
         continue
@@ -72,7 +72,7 @@ for notebook in targets:
         failed = True
         continue
     dst.parent.mkdir(exist_ok=True)
-    dst.write_text(published(src, notebook))
+    dst.write_text(build(src, notebook))
     git("add", rel).check_returncode()
-    print(f"✓ published and staged {rel}")
+    print(f"✓ built and staged {rel}")
 sys.exit(1 if failed else 0)
