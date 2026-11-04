@@ -19,7 +19,7 @@ app = marimo.App(width="medium", app_title="TODO Engine name", auto_download=["i
 with app.setup(hide_code=True):
     # cell: client
     # Shared scaffolding, generated from client.py by scripts/sync_client.py: edit client.py, not this block.
-    # Only the public helpers and AUTORUN are visible to other cells; import any module you use in your own cells.
+    # Only the public helpers are visible to other cells; import any module you use in your own cells.
     # Imported under private names so a notebook's setup cell exposes only the public helpers (and the module
     # names stay free for the notebook's own imports, as they would be with `from moth_atlas import ...`).
     import hashlib as _hashlib
@@ -114,9 +114,6 @@ with app.setup(hide_code=True):
         url = out.get("url") or _call("GET", f"/assets/{out['output_asset_id']}/download")["download_url"]
         return _presigned("GET", url).content
 
-    # Headless exports: run every cell without pressing buttons. (Own line: marimo drops a trailing comment on save.)
-    AUTORUN = _os.environ.get("MOTH_AUTORUN") == "1"
-
 
 @app.cell
 def _():
@@ -194,7 +191,7 @@ def _(mo):
 @app.cell
 def _(ASSET_NAME, mo, params, preview, run, run_engine):
     # cell: run
-    mo.stop(not (run.value or AUTORUN), mo.md("Press **Generate** to see the result."))
+    mo.stop(not run.value, mo.md("Press **Generate** to see the result."))
     asset = run_engine(params.value)
     mo.vstack([mo.download(asset, filename=ASSET_NAME), preview(asset)])
     return
@@ -261,7 +258,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(ASSET_NAME, SWEEP, mo, params, preview, run_engine, run_sweep):
     # cell: sweep
-    mo.stop(not (run_sweep.value or AUTORUN), mo.md("Press **Run sweep** to compare the values above."))
+    mo.stop(not run_sweep.value, mo.md("Press **Run sweep** to compare the values above."))
     assets = {f"TODO_param = {v}": run_engine({**params.value, "TODO_param": v}) for v in SWEEP}
     mo.ui.tabs({k: mo.vstack([mo.download(a, filename=ASSET_NAME), preview(a)]) for k, a in assets.items()})
     return
