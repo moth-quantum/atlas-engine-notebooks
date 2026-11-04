@@ -2,6 +2,7 @@
 """Generate the shared scaffolding in every engine notebook from client.py.
 
     scripts/sync_client.py             # rewrite the setup cell in each engine notebook and template
+    scripts/sync_client.py coin_toss   # only <engine>/<engine>_notebook.py
     scripts/sync_client.py --check     # exit 1 if any notebook is out of date (for CI)
 
 client.py is the source of truth. Each notebook holds one generated cell, identical in every engine, so it
@@ -57,8 +58,12 @@ def sync(path):
 
 def main():
     check = "--check" in sys.argv[1:]
+    engines = [a for a in sys.argv[1:] if a != "--check"]
+    paths = [ROOT / e / f"{e}_notebook.py" for e in engines] or sorted([*ROOT.glob("*/*_notebook.py"), *ROOT.glob("templates/*.py")])
+    if missing := [str(p.relative_to(ROOT)) for p in paths if not p.exists()]:
+        sys.exit(f"no such notebook: {', '.join(missing)}")
     stale = []
-    for nb in sorted([*ROOT.glob("*/*_notebook.py"), *ROOT.glob("templates/*.py")]):
+    for nb in paths:
         updated = sync(nb)
         if updated != nb.read_text():
             stale.append(nb)

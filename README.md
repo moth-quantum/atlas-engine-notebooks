@@ -53,23 +53,25 @@ The hook generates a renderable `.ipynb` of your saved results for GitHub and At
 
 ### Create your notebook
 
-Pick the template for your kind of engine, copy it into your engine's folder, and put any sample inputs beside it. Fill in the `TODO`s and add what your engine needs.
+`<engine>` is the engine's name in snake_case without its version, e.g. `coin_toss` for `coin-toss-v1` (see [Notebook format](#notebook-format)).
 
-| template | input | output shown as |
-|---|---|---|
-| [`1_core_engine`](templates/1_core_engine.py) | parameters | JSON, and a table for the sweep |
-| [`2_image_engine`](templates/2_image_engine.py) | an image + parameters | a before/after slider, and a gallery for the sweep |
-| [`3_audio_engine`](templates/3_audio_engine.py) | audio + parameters | before and after players |
-| [`4_asset_engine`](templates/4_asset_engine.py) | parameters | a download button, and a preview tab per file |
-| [`5_generative_engine`](templates/5_generative_engine.py) | an example to train on, then parameters to generate | the trained model to download, and the generated sequence |
+Pick the template for your kind of engine:
+
+| template | input | output shown as | finished example |
+|---|---|---|---|
+| [`1_core_engine`](templates/1_core_engine.py) | parameters | JSON, and a table for the sweep | [Coin Toss](coin_toss/coin_toss_notebook.py) |
+| [`2_image_engine`](templates/2_image_engine.py) | an image + parameters | a before/after slider, and a gallery for the sweep | [Blur](blur/blur_notebook.py), [Teleblur](telablur/telablur_notebook.py) (two images) |
+| [`3_audio_engine`](templates/3_audio_engine.py) | audio + parameters | before and after players | |
+| [`4_asset_engine`](templates/4_asset_engine.py) | parameters | a download button, and a preview tab per file | |
+| [`5_generative_engine`](templates/5_generative_engine.py) | an example to train on, then parameters to generate | the trained model to download, and the generated sequence | |
+
+For example, Coin Toss started from the core template:
 
 ```bash
-mkdir <engine> && cp templates/<n>_<kind>_engine.py <engine>/<engine>_notebook.py
+mkdir coin_toss && cp templates/1_core_engine.py coin_toss/coin_toss_notebook.py
 ```
 
-`<engine>` is the engine's name in snake_case without its version, e.g. `deep_fryer` for `deep-fryer-v1` (see [Notebook format](#notebook-format)).
-
-The [Blur notebook](blur/blur_notebook.py) is a finished image engine notebook.
+Then fill in every `TODO` from the engine's docs, and put any sample inputs beside the notebook.
 
 ### Write, run and save
 
