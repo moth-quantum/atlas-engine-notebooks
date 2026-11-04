@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Create and manage Moth notebooks from the command line. Needs curl, jq, MOTH_API_KEY, and a moth-api that has
-# the notebook endpoints (v0.47+); point MOTH_API_BASE at it if the default API doesn't.
+# Create and manage Moth notebooks from the command line. Needs curl, jq and MOTH_API_KEY; MOTH_API_BASE
+# points at another API.
 #
 #   scripts/notebook.sh create <git-url> [ref] [path]   create from a public repo and wait until ready
 #   scripts/notebook.sh status <id>                     phase, readiness and why it is not ready
