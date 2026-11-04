@@ -1,5 +1,5 @@
-# One-time setup: `pre-commit install`. On every commit this publishes each notebook's saved run from __marimo__/
-# to outputs/ (scripts/snapshot.py). When it writes a file the commit stops once: `git add` it and commit again.
+# One-time setup: `pre-commit install`. On every commit this publishes each notebook's latest saved run to outputs/
+# and stages it (scripts/snapshot.py), so it joins the commit. A run that is incomplete, failed or stale blocks the commit.
 repos:
   - repo: local
     hooks:

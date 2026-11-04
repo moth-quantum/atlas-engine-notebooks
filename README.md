@@ -38,15 +38,17 @@ Once per clone, install the commit hook (`pre-commit` is in `requirements.txt`):
 pre-commit install
 ```
 
-1. **Copy and write.** Copy [`templates/engine_notebook.py`](templates/engine_notebook.py) to `<engine>/<engine>_notebook.py`, put any sample inputs beside it, and fill in every `TODO`; [`blur/blur_notebook.py`](blur/blur_notebook.py) is a finished example. Present the demo however you like with marimo's controls, images and layouts.
-2. **Run and save.** In `marimo edit`, with your own `MOTH_API_KEY`, run every cell, press each run button, then save. marimo keeps the run, with its outputs, in `<engine>/__marimo__/`.
-3. **Commit.** Commit the notebook, plus a short `<engine>/README.md` and a row in the table above, and open a pull request. The hook publishes your saved run to `<engine>/outputs/<engine>_notebook.ipynb`; the first time, it stops the commit and asks you to `git add` that file and commit again.
+1. **Copy.** Copy the template and fill in every `TODO`; [`blur/blur_notebook.py`](blur/blur_notebook.py) is a finished example. Put any sample inputs beside it.
+   ```bash
+   mkdir <engine> && cp templates/engine_notebook.py <engine>/<engine>_notebook.py
+   ```
+2. **Write and run.** With your own `MOTH_API_KEY`, open it in the editor, run every cell, press each run button, then save. Present the demo however you like with marimo's controls, images and layouts.
+   ```bash
+   marimo edit <engine>/<engine>_notebook.py
+   ```
+3. **Commit.** Commit the notebook, plus a short `<engine>/README.md` and a row in the table above, and open a pull request. The hook publishes your saved run as `<engine>/outputs/<engine>_notebook.ipynb` and adds it to the commit. If the run is incomplete, failed or out of date, it stops the commit and says which cell; fix it in the editor, save, and commit again.
 
-CI checks every pull request without an API key: the generated client is up to date, `marimo check` passes, and the published run is complete, matches the notebook, and has no links to your editor. If you change the notebook, run it and save again before committing. Without the hook, publish by hand with `python scripts/snapshot.py <engine>`. To check before you push:
-
-```bash
-python scripts/check_runs.py <engine>
-```
+After any change to the notebook, save it in the editor before committing. To check a run without committing, stage the notebook and run `python scripts/snapshot.py <engine>`; it refuses a notebook with unstaged changes, since the saved run may belong to them. The hook publishes only the notebooks in your commit, and it needs `pre-commit install`, so CI still runs the same checks, without an API key, on every pull request (plus `marimo check` and the generated client).
 
 ## How the notebooks are built
 

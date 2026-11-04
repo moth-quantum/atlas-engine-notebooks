@@ -21,3 +21,5 @@ jobs:
         run: marimo check */*_notebook.py
       - name: Saved runs are complete and match the notebooks
         run: python scripts/check_runs.py
+      - name: Commit hook keeps each published run with its notebook
+        run: python scripts/test_snapshot.py
