@@ -1,9 +1,7 @@
 .venv/
 __pycache__/
-# marimo's working folder: only the saved run (<engine>/__marimo__/<engine>_notebook.ipynb) is committed.
-**/__marimo__/*
-!**/__marimo__/*_notebook.ipynb
-templates/__marimo__/*
+# marimo's working folder; scripts/snapshot.py publishes the saved run from it to <engine>/outputs/.
+__marimo__/
 *.ipynb_checkpoints
 blur/outputs/*.html
 .DS_Store

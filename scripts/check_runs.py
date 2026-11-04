@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Check each engine notebook's committed saved run (the file Atlas renders). Runs in CI; needs no API key.
+"""Check each engine notebook's published run (the file Atlas and GitHub render). Runs in CI; needs no API key.
 
     python scripts/check_runs.py            # every <engine>/<engine>_notebook.py
     python scripts/check_runs.py blur       # one engine
 
-The saved run is <engine>/__marimo__/<engine>_notebook.ipynb, written by marimo on save (auto_download=["ipynb"])
-after the author ran the notebook with their own key. It fails when:
+The published run is <engine>/outputs/<engine>_notebook.ipynb: the run marimo saved in __marimo__/ after the author
+ran the notebook with their own key, cleaned by scripts/snapshot.py (the pre-commit hook runs it). It fails when:
 
 - a cell has no valid `# cell: <id>` marker (lowercase letters, digits and -), or an id is used twice;
-- the saved run is missing;
+- the published run is missing, or still holds HTML that only works in the author's editor (./@file/ links);
 - the run is incomplete: a cell that displays something has no output, or still shows its "Press **Run …**" message;
 - the run is stale: a cell's code or a markdown cell differs from the notebook, so it was edited after the run was saved.
 """
@@ -26,7 +26,25 @@ ROOT = Path(__file__).resolve().parent.parent
 MARKER = re.compile(r"\s*# cell: (\S+)")
 VALID_ID = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 MARKDOWN = re.compile(r'\s*# cell: \S+\s*\n\s*mo\.md\(r?"""(.*?)"""\)\s*', re.S)
-FIX = "In the editor, run every cell and press each run button, then save and commit the saved run again."
+BANNER = "generated-banner"  # the markdown cell snapshot.py adds at the top of the published run
+FIX = "In the editor, run every cell and press each run button, then save and commit again."
+
+
+def notebooks(engines):
+    paths = [ROOT / e / f"{e}_notebook.py" for e in engines] if engines else sorted(
+        p for p in ROOT.glob("*/*_notebook.py") if p.parent.name != "templates")
+    missing = [str(p.relative_to(ROOT)) for p in paths if not p.exists()]
+    if missing:
+        sys.exit(f"no such notebook: {', '.join(missing)}")
+    return paths
+
+
+def saved_run(notebook):
+    return notebook.parent / "__marimo__" / f"{notebook.stem}.ipynb"
+
+
+def published_run(notebook):
+    return notebook.parent / "outputs" / f"{notebook.stem}.ipynb"
 
 
 def cell_id(code):
@@ -48,8 +66,8 @@ def not_run(outputs):
     return re.search(r"Press (\*\*|<strong>)", json.dumps([o.get("data", {}) for o in outputs])) is not None
 
 
-def check(notebook):
-    engine_dir, name = notebook.parent, notebook.stem
+def check(notebook, run):
+    """Problems with `run` (a saved or published .ipynb) as the run of `notebook`; empty when it's fine."""
     cells = parse_notebook(notebook.read_text()).cells
     problems = []
 
@@ -63,9 +81,8 @@ def check(notebook):
     if problems:
         return problems
 
-    run = engine_dir / "__marimo__" / f"{name}.ipynb"
     if not run.exists():
-        return [f"no saved run at {run.relative_to(ROOT)}. {FIX}"]
+        return [f"no run at {run.relative_to(ROOT)}. {FIX}"]
     saved = json.loads(run.read_text())["cells"]
 
     code = {cell_id(c.code): c.code for c in cells if not MARKDOWN.fullmatch(c.code)}
@@ -86,7 +103,7 @@ def check(notebook):
     problems += [f"{cid}: in the saved run but no longer in the notebook" for cid in saved_code if cid not in code]
 
     markdown = [textwrap.dedent(MARKDOWN.fullmatch(c.code).group(1)).strip() for c in cells if MARKDOWN.fullmatch(c.code)]
-    saved_markdown = ["".join(c["source"]).strip() for c in saved if c["cell_type"] == "markdown"]
+    saved_markdown = ["".join(c["source"]).strip() for c in saved if c["cell_type"] == "markdown" and c.get("id") != BANNER]
     if markdown != saved_markdown:
         problems.append("markdown text changed since the run was saved")
 
@@ -96,15 +113,12 @@ def check(notebook):
 
 
 def main():
-    engines = sys.argv[1:]
-    notebooks = [ROOT / e / f"{e}_notebook.py" for e in engines] if engines else sorted(
-        p for p in ROOT.glob("*/*_notebook.py") if p.parent.name != "templates")
-    missing = [str(n.relative_to(ROOT)) for n in notebooks if not n.exists()]
-    if missing:
-        sys.exit(f"no such notebook: {', '.join(missing)}")
     failed = False
-    for notebook in notebooks:
-        problems = check(notebook)
+    for notebook in notebooks(sys.argv[1:]):
+        run = published_run(notebook)
+        problems = check(notebook, run)
+        if not problems and "./@file/" in run.read_text():
+            problems = [f"{run.relative_to(ROOT)} has links to the author's editor; run `python scripts/snapshot.py {notebook.parent.name}`"]
         print(f"{'✗' if problems else '✓'} {notebook.relative_to(ROOT)}")
         for p in problems:
             print(f"    {p}")

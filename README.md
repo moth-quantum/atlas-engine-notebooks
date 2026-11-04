@@ -4,7 +4,7 @@
 
 | engine | notebook | saved run |
 |---|---|---|
-| `blur-v1` | [`blur/blur_notebook.py`](blur/blur_notebook.py) | [`blur/__marimo__/blur_notebook.ipynb`](blur/__marimo__/blur_notebook.ipynb) |
+| `blur-v1` | [`blur/blur_notebook.py`](blur/blur_notebook.py) | [`blur/outputs/blur_notebook.ipynb`](blur/outputs/blur_notebook.ipynb) |
 
 ## Run a notebook
 
@@ -32,11 +32,17 @@ Nothing is submitted until you press a run button.
 
 ## Add an engine
 
-1. **Copy and write.** Copy [`templates/engine_notebook.py`](templates/engine_notebook.py) to `<engine>/<engine>_notebook.py`, put any sample inputs beside it, and fill in every `TODO`; [`blur/blur_notebook.py`](blur/blur_notebook.py) is a finished example. Present the demo however you like with marimo's controls, images and layouts.
-2. **Run and save.** In `marimo edit`, with your own `MOTH_API_KEY`, run every cell, press each run button, then save. marimo writes `<engine>/__marimo__/<engine>_notebook.ipynb`: the saved run, with its outputs, that Atlas shows.
-3. **Commit.** Commit the notebook and its saved run together, plus a short `<engine>/README.md` and a row in the table above, and open a pull request.
+Once per clone, install the commit hook (`pre-commit` is in `requirements.txt`):
 
-CI checks every pull request without an API key: the generated client is up to date, `marimo check` passes, and the saved run is complete and matches the notebook. If you change the notebook, run it and save again before committing. To check before you push:
+```bash
+pre-commit install
+```
+
+1. **Copy and write.** Copy [`templates/engine_notebook.py`](templates/engine_notebook.py) to `<engine>/<engine>_notebook.py`, put any sample inputs beside it, and fill in every `TODO`; [`blur/blur_notebook.py`](blur/blur_notebook.py) is a finished example. Present the demo however you like with marimo's controls, images and layouts.
+2. **Run and save.** In `marimo edit`, with your own `MOTH_API_KEY`, run every cell, press each run button, then save. marimo keeps the run, with its outputs, in `<engine>/__marimo__/`.
+3. **Commit.** Commit the notebook, plus a short `<engine>/README.md` and a row in the table above, and open a pull request. The hook publishes your saved run to `<engine>/outputs/<engine>_notebook.ipynb`; the first time, it stops the commit and asks you to `git add` that file and commit again.
+
+CI checks every pull request without an API key: the generated client is up to date, `marimo check` passes, and the published run is complete, matches the notebook, and has no links to your editor. If you change the notebook, run it and save again before committing. Without the hook, publish by hand with `python scripts/snapshot.py <engine>`. To check before you push:
 
 ```bash
 python scripts/check_runs.py <engine>
@@ -45,7 +51,7 @@ python scripts/check_runs.py <engine>
 ## How the notebooks are built
 
 - **Shared helpers.** [`client.py`](client.py) defines `upload`, `submit`, `wait` and `download`. `scripts/sync_client.py` copies it into each notebook's hidden `with app.setup` block (`# cell: client`), so every notebook runs on its own; don't edit that block by hand. It provides only those helpers and `AUTORUN`, so import everything else your cells use in the notebook's `setup` cell.
-- **Saved run.** With `auto_download=["ipynb"]`, the marimo editor writes the notebook and its outputs to `<engine>/__marimo__/<engine>_notebook.ipynb` on every save. That file is committed (the rest of `__marimo__/` is ignored) and is what Atlas renders, so nothing re-runs to show a notebook. Don't edit it by hand; `scripts/check_runs.py` checks it in CI.
+- **Saved run.** With `auto_download=["ipynb"]`, the marimo editor writes the notebook and its outputs to `<engine>/__marimo__/<engine>_notebook.ipynb` on every save (git-ignored). `scripts/snapshot.py`, run by the commit hook, refuses an incomplete or stale run and publishes it to `<engine>/outputs/<engine>_notebook.ipynb` without the HTML that only works in the editor, so GitHub and Atlas show every image and nothing re-runs to render. Don't edit the published file; `scripts/check_runs.py` checks it in CI.
 - **No secrets.** No credentials, tokens or private hostnames in any file.
 
 ## Notebook format
@@ -60,7 +66,7 @@ Atlas renders each engine's **Notebook** page from these files, so every noteboo
 6. **Parameters.** `params` holds one `mo.ui` control per engine parameter, plus the run button. `run` sends them as a dict of `"name": control.value` pairs, and the `parameters` cell documents each one (type, default, effect).
 7. **Questions.** `mo.md("## Questions")` plus `mo.accordion({...})` of `"question": "answer"` string pairs.
 8. **No surprise jobs.** Nothing calls the API until a run button is pressed (`mo.stop(not (button.value or AUTORUN), …)`), and reader-facing text stays about the science and the results.
-9. **Saved run.** `<engine>/__marimo__/<engine>_notebook.ipynb` is committed with every change to the notebook, complete and matching its code (see "Saved run").
+9. **Saved run.** `<engine>/outputs/<engine>_notebook.ipynb` is committed with every change to the notebook, complete and matching its code (see "Saved run").
 
 ## License
 
