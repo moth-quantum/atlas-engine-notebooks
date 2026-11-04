@@ -7,7 +7,7 @@
 # ]
 # ///
 
-# Template for core engines: parameters (or a numeric array) in, a JSON result out.
+# Template for core engines: parameters, including arrays, and optional JSON or text files in; a JSON result out.
 # Copy it to <engine>/<engine>_notebook.py and fill in every TODO. Run every cell with your key, press each run
 # button, save, and commit: the hook builds the static .ipynb.
 
@@ -150,8 +150,8 @@ def _():
     ENGINE_ID = "TODO-v1"
 
     def run_engine(params):
-        """Run one job; returns its JSON result as a dict."""
-        job_id = submit(ENGINE_ID, params)
+        """Run one job; returns its JSON result (a dict or a list)."""
+        job_id = submit(ENGINE_ID, params)  # for an input file, pass {"TODO_slot": upload(path)}
         wait(job_id)
         return download(job_id)
 
@@ -242,7 +242,7 @@ def _(mo):
 def _(SWEEP, mo, params, run_engine, run_sweep):
     # cell: sweep
     mo.stop(not run_sweep.value, mo.md("Press **Run sweep** to compare the values above."))
-    rows = [{"TODO_param": v, **run_engine({**params.value, "TODO_param": v})} for v in SWEEP]
+    rows = [{"TODO_param": v, "result": run_engine({**params.value, "TODO_param": v})} for v in SWEEP]
     mo.ui.table(rows, selection=None)
     return
 

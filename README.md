@@ -59,7 +59,7 @@ Pick the template for your kind of engine:
 
 | template | input | output shown as | finished example |
 |---|---|---|---|
-| [`1_core_engine`](templates/1_core_engine.py) | parameters | JSON, and a table for the sweep | [Coin Toss](coin_toss/coin_toss_notebook.py) |
+| [`1_core_engine`](templates/1_core_engine.py) | parameters + arrays / JSON | JSON, and a table for the sweep | [Coin Toss](coin_toss/coin_toss_notebook.py) |
 | [`2_image_engine`](templates/2_image_engine.py) | an image + parameters | a before/after slider, and a gallery for the sweep | [Blur](blur/blur_notebook.py), [Teleblur](telablur/telablur_notebook.py) (two images) |
 | [`3_audio_engine`](templates/3_audio_engine.py) | audio + parameters | before and after players | |
 | [`4_asset_engine`](templates/4_asset_engine.py) | parameters | a download button, and a preview tab per file | |
