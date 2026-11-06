@@ -127,6 +127,8 @@ def _():
 def _(mo):
     # cell: intro
     mo.md(r"""
+    # Coin Toss
+
     Flip a quantum coin a number of times and get back the heads and tails counts.
     """)
     return
