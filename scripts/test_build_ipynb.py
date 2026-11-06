@@ -83,7 +83,7 @@ try:
         (REPO / engine / "__marimo__").mkdir()
         (REPO / engine / "__marimo__" / f"{engine}_notebook.ipynb").write_text(json.dumps(data))
     first = next(c for c in data["cells"] if c["cell_type"] == "markdown")
-    FIRST = "".join(first["source"]).split(".")[0]
+    FIRST = "".join(first["source"]).splitlines()[-1].split(".")[0]  # first sentence after the title
     (REPO / ".gitignore").write_text("__marimo__/\n")
     (REPO / "notes.md").write_text("notes\n")
     sh("git", "init", "-q")

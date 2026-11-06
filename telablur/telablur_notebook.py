@@ -127,6 +127,8 @@ def _():
 def _(mo):
     # cell: intro
     mo.md(r"""
+    # Quantum Teleblur
+
     Quantum Teleblur morphs one image into another through qubit rotations.
     """)
     return

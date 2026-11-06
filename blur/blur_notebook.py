@@ -131,6 +131,8 @@ def _():
 def _(mo):
     # cell: intro
     mo.md(r"""
+    # Blur
+
     Quantum Blur turns an image into a single quantum state, rotates every qubit once, and measures the state back into pixels. One gate moves amplitude between pixels that can be far apart, so instead of soft focus you get echoes and interference that no convolution kernel produces.
     """)
     return
