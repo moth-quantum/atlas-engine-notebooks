@@ -10,7 +10,7 @@ Jupyter notebooks for the engines on [Atlas](https://platform.mothquantum.com), 
 
 ## Run a notebook
 
-You need a Moth API key from the Atlas **API keys** page. Keys are read from the environment only; nothing in this repo contains one.
+You need a Moth API key from the Atlas **API keys** page. Set it as `MOTH_API_KEY`, or enter it when the notebook asks; it is never saved in the notebook.
 
 ```bash
 pip install -r requirements.txt
@@ -47,7 +47,7 @@ Open a pull request with the notebook, its sample inputs, a short `<engine>/READ
 2. **Sections**, in this order: a `# <engine display name>` title and intro, `## Setup`, `## Try it`, `## Parameters` (each parameter's type, default and effect), `## How it works`, `## Experiments` (one `###` per experiment) and `## Questions`.
 3. **API calls.** Use `moth_atlas`. **Try it** shows the calls step by step (`assets.upload`, `jobs.submit`, `jobs.wait`, `jobs.download`); experiments can use `jobs.run`.
 4. **Saved outputs.** Commit the notebook after a complete run, with no error outputs.
-5. **No secrets.** No credentials, tokens or private hostnames in any file. The client reads `MOTH_API_KEY` from the environment.
+5. **No secrets.** No credentials, tokens or private hostnames in any file. Keep the setup cell's key prompt: it reads `MOTH_API_KEY`, or asks for the key without saving it.
 
 ## License
 
