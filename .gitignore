@@ -1,7 +1,5 @@
 .venv/
 __pycache__/
-# marimo's working folder; scripts/build_ipynb.py builds the static .ipynb in <engine>/outputs/ from it.
-__marimo__/
 *.ipynb_checkpoints
-blur/outputs/*.html
 .DS_Store
+__marimo__/
