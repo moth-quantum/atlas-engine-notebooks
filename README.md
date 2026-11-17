@@ -44,7 +44,7 @@ Open a pull request with the notebook, its sample inputs, a short `<engine>/READ
 
 1. **File.** `<engine>/<engine>_notebook.ipynb`. Engines that work as a pair share one folder named after the family (`qrc-train-v2` and `qrc-gen-v2` → `qrc/qrc_notebook.ipynb`).
 2. **Sections**, in this order: a `# <engine display name>` title and intro, `## Setup`, `## Try it`, `## Parameters` (each parameter's type, default and effect), `## How it works`, `## Experiments` (one `###` per experiment) and `## Questions`.
-3. **API calls.** Use `moth_atlas`. **Try it** shows the calls step by step (`assets.upload`, `jobs.submit`, `jobs.wait`, `jobs.download`); experiments can use `jobs.run`.
+3. **API calls.** Use `moth_atlas`. **Try it** is one `client.jobs.run(...)` call, laid out like the example the engine's definition prints, with the params a reader should try, then the output next to the input. **Parameters** says what to expect from each, then displays `client.engines.get(...)`. Experiments run with `quiet=True` and print each job's params.
 4. **Saved outputs.** Commit the notebook after a complete run, with no error outputs.
 5. **No secrets.** No credentials, tokens or private hostnames in any file. Keep the setup cell's key prompt: it reads `MOTH_API_KEY`, or asks for the key without saving it.
 
