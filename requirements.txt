@@ -1,6 +1,3 @@
-marimo>=0.25
-nbformat>=5.10
-numpy>=1.26
+moth-atlas~=0.2.0
+jupyterlab
 pillow>=10
-requests>=2.31
-pre-commit>=3
