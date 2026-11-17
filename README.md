@@ -14,12 +14,11 @@ You need a Moth API key from the Atlas **API keys** page. Set it as `MOTH_API_KE
 
 ```bash
 pip install -r requirements.txt
-pip install --pre --no-deps -i https://test.pypi.org/simple/ moth-atlas
 export MOTH_API_KEY=...
 jupyter lab blur/blur_notebook.ipynb
 ```
 
-`moth-atlas` is on TestPyPI until its PyPI release; `--no-deps` keeps its dependencies (in `requirements.txt`) coming from PyPI. Each code cell that submits a job runs only when you run it.
+Each code cell that submits a job runs only when you run it.
 
 ## Write a notebook for your engine
 
