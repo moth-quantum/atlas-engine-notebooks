@@ -1,6 +1,8 @@
 # atlas-engine-notebooks
 
-Jupyter notebooks for the engines on [Atlas](https://platform.mothquantum.com), Moth Quantum's platform. Each notebook runs an engine with the [`moth-atlas`](https://github.com/moth-quantum/moth-atlas-python) Python client and explains what it does. Atlas renders each engine's **Notebook** page from these files.
+Jupyter notebooks for the engines on [Atlas](https://platform.mothquantum.com), Moth Quantum's platform. Each notebook runs an engine with the [`moth-atlas`](https://pypi.org/project/moth-atlas/) Python client and explains what it does. Atlas renders each engine's **Notebook** page from these files.
+
+New to the SDK? Start with [`sdk-quickstart.ipynb`](sdk-quickstart.ipynb), a generic tour: install, run an engine, pass params and files, assets, browse engines.
 
 | engine | notebook |
 |---|---|
