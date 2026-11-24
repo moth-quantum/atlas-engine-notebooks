@@ -4,4 +4,4 @@
 
 - `image1.png`, `image2.png`: the 256 × 256 source and target samples.
 
-Family: Blur (core engine in `blur_core/`).
+Family: Blur.

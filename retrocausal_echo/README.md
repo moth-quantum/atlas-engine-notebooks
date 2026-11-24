@@ -4,4 +4,4 @@
 
 - `snare_crack.wav`, `rhodes_c4.wav`: from Moth's QEcho sample pack (synthesised, mono 24-bit / 44.1 kHz).
 
-Family: Echo (core engine in `otoc_echo/`). The API names this engine Retrocausal Echo.
+Family: Echo. The API names this engine Retrocausal Echo. By Spencer Topel; see also the [Retrocausal Sequencer](https://retrocausal-echo-vst-development.vercel.app/).

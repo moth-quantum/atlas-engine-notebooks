@@ -6,4 +6,4 @@
 
 Related: the engine's [QuantumBlur](https://github.com/qiskit-community/QuantumBlur) origins.
 
-Family: Blur (core engine in `blur_core/`).
+Family: Blur.

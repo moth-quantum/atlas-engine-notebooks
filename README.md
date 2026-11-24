@@ -4,24 +4,21 @@ Jupyter notebooks for the engines on [Atlas](https://platform.mothquantum.com), 
 
 New to the SDK? Start with [`sdk-quickstart.ipynb`](sdk-quickstart.ipynb), a generic tour: install, run an engine, pass params and files, assets, browse engines.
 
-Notebooks are grouped the way Atlas groups engines: each family has a **core engine** that works on plain numbers, and **media engines** that apply it to one kind of file. Every notebook calls its engine through one line in its setup cell, `ENGINE = "...-staging"`; change that line to run it on another deployment (e.g. the `-v1` production ID).
+Notebooks are grouped the way Atlas groups engines: each family has a core engine that works on plain numbers, and media engines that apply it to one kind of file. Every notebook calls its engine through one line in its setup cell, `ENGINE = "...-staging"`; change that line to run it on another deployment (e.g. the `-v1` production ID).
 
-| family | engine | role | notebook |
+| family | engine | Atlas name | notebook |
 |---|---|---|---|
-| Blur | `blur-core-staging` | core | [`blur_core/blur_core_notebook.ipynb`](blur_core/blur_core_notebook.ipynb) |
-| | `blur-staging` | Blur Image | [`blur/blur_notebook.ipynb`](blur/blur_notebook.ipynb) |
+| Blur | `blur-staging` | Blur Image | [`blur/blur_notebook.ipynb`](blur/blur_notebook.ipynb) |
 | | `telablur-staging` | Teleblur | [`telablur/telablur_notebook.ipynb`](telablur/telablur_notebook.ipynb) |
 | | `blur-midi-staging` | Blur MIDI | [`blur_midi/blur_midi_notebook.ipynb`](blur_midi/blur_midi_notebook.ipynb) |
 | Tessa | `tessa-image-staging` | Tessa Image | [`tessa_image/tessa_image_notebook.ipynb`](tessa_image/tessa_image_notebook.ipynb) |
-| Echo | `otoc-echo-staging` | core | [`otoc_echo/otoc_echo_notebook.ipynb`](otoc_echo/otoc_echo_notebook.ipynb) |
-| | `retrocausal-echo-staging` | Echo Audio | [`retrocausal_echo/retrocausal_echo_notebook.ipynb`](retrocausal_echo/retrocausal_echo_notebook.ipynb) |
-| Labyrinth | `graph-staging` | core | [`graph/graph_notebook.ipynb`](graph/graph_notebook.ipynb) |
-| | `labyrinth-staging` | Labyrinth Level | [`labyrinth/labyrinth_notebook.ipynb`](labyrinth/labyrinth_notebook.ipynb) |
+| Echo | `retrocausal-echo-staging` | Echo Audio | [`retrocausal_echo/retrocausal_echo_notebook.ipynb`](retrocausal_echo/retrocausal_echo_notebook.ipynb) |
+| Labyrinth | `labyrinth-staging` | Labyrinth Level | [`labyrinth/labyrinth_notebook.ipynb`](labyrinth/labyrinth_notebook.ipynb) |
 | Reservoir | `qrc-audio-staging` | Reservoir Audio | [`qrc_audio/qrc_audio_notebook.ipynb`](qrc_audio/qrc_audio_notebook.ipynb) |
 | | `qrc-midi-staging` | Reservoir MIDI | [`qrc_midi/qrc_midi_notebook.ipynb`](qrc_midi/qrc_midi_notebook.ipynb) |
 | Prism | `entanglement-shader-staging` | Prism Shader | [`entanglement_shader/entanglement_shader_notebook.ipynb`](entanglement_shader/entanglement_shader_notebook.ipynb) |
-| Entropy | `comet-qrng-staging` | core | [`comet_qrng/comet_qrng_notebook.ipynb`](comet_qrng/comet_qrng_notebook.ipynb) |
-| | `coin-toss-staging` | Coin Toss | [`coin_toss/coin_toss_notebook.ipynb`](coin_toss/coin_toss_notebook.ipynb) |
+| Entropy | `comet-qrng-staging` | Entropy Core | [`comet_qrng/comet_qrng_notebook.ipynb`](comet_qrng/comet_qrng_notebook.ipynb) |
+| | `coin-toss-v1` | Coin Toss | [`coin_toss/coin_toss_notebook.ipynb`](coin_toss/coin_toss_notebook.ipynb) |
 
 Folders are still one per engine; moving them into one folder per family is tracked in [#7](https://github.com/moth-quantum/atlas-engine-notebooks/issues/7).
 
@@ -41,7 +38,7 @@ To run notebooks top to bottom and save their outputs in place (what a pull requ
 
 ```bash
 ./run_notebooks.sh                    # every engine notebook
-./run_notebooks.sh otoc_echo labyrinth
+./run_notebooks.sh qrc_audio labyrinth
 ```
 
 ## Write a notebook for your engine

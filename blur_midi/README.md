@@ -4,4 +4,4 @@
 
 - `phrase.mid`: an original 8-bar phrase (melody and bass, 100 bpm) made for these notebooks.
 
-Family: Blur (core engine in `blur_core/`).
+Family: Blur.
