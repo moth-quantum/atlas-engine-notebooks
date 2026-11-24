@@ -1,3 +1,6 @@
 moth-atlas~=0.3.0
 jupyterlab
 pillow>=10
+numpy
+matplotlib>=3.8
+pretty_midi
