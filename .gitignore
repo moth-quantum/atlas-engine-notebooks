@@ -5,4 +5,4 @@ __pycache__/
 __marimo__/
 
 # Files the notebooks save when they run
-entanglement_shader/shader_*.zip
+prism/shader_*.zip
