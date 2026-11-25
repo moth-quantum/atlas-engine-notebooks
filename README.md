@@ -4,27 +4,27 @@ Jupyter notebooks for the engines on [Atlas](https://platform.mothquantum.com), 
 
 New to the SDK? Start with [`sdk-quickstart.ipynb`](sdk-quickstart.ipynb), a generic tour: install, run an engine, pass params and files, assets, browse engines.
 
-Notebooks are grouped the way Atlas groups engines: each family has a core engine that works on plain numbers, and media engines that apply it to one kind of file. Every notebook calls its engine through one line in its setup cell, `ENGINE = "...-staging"`; change that line to run it on another deployment (e.g. the `-v1` production ID).
+Notebooks are grouped the way Atlas groups engines: each family has a core engine that works on plain numbers, and media engines that apply it to one kind of file. Every notebook calls its engine through one line in its setup cell, `ENGINE = "..."`; change that line to run another version of the engine.
 
 | family | engine | Atlas name | notebook |
 |---|---|---|---|
-| Blur | `blur-staging` | Blur Image | [`blur/blur_notebook.ipynb`](blur/blur_notebook.ipynb) |
-| | `telablur-staging` | Teleblur | [`blur/teleblur_notebook.ipynb`](blur/teleblur_notebook.ipynb) |
-| | `blur-midi-staging` | Blur MIDI | [`blur/blur_midi_notebook.ipynb`](blur/blur_midi_notebook.ipynb) |
-| Tessa | `tessa-image-staging` | Tessa Image | [`tessa/tessa_image_notebook.ipynb`](tessa/tessa_image_notebook.ipynb) |
-| Echo | `retrocausal-echo-staging` | Echo Audio | [`echo/echo_audio_notebook.ipynb`](echo/echo_audio_notebook.ipynb) |
-| Labyrinth | `labyrinth-staging` | Labyrinth Level | [`labyrinth/labyrinth_level_notebook.ipynb`](labyrinth/labyrinth_level_notebook.ipynb) |
-| Reservoir | `qrc-audio-staging` | Reservoir Audio | [`reservoir/reservoir_audio_notebook.ipynb`](reservoir/reservoir_audio_notebook.ipynb) |
-| | `qrc-midi-staging` | Reservoir MIDI | [`reservoir/reservoir_midi_notebook.ipynb`](reservoir/reservoir_midi_notebook.ipynb) |
-| Prism | `entanglement-shader-staging` | Prism Shader | [`prism/prism_shader_notebook.ipynb`](prism/prism_shader_notebook.ipynb) |
-| Entropy | `comet-qrng-staging` | Entropy Core | [`entropy/entropy_core_notebook.ipynb`](entropy/entropy_core_notebook.ipynb) |
+| Blur | `blur-v1` | Blur Image | [`blur/blur_notebook.ipynb`](blur/blur_notebook.ipynb) |
+| | `telablur-v1` | Teleblur | [`blur/teleblur_notebook.ipynb`](blur/teleblur_notebook.ipynb) |
+| | `blur-midi-v1` | Blur MIDI | [`blur/blur_midi_notebook.ipynb`](blur/blur_midi_notebook.ipynb) |
+| Tessa | `tessa-image-v1` | Tessa Image | [`tessa/tessa_image_notebook.ipynb`](tessa/tessa_image_notebook.ipynb) |
+| Echo | `retrocausal-echo-v1` | Echo Audio | [`echo/echo_audio_notebook.ipynb`](echo/echo_audio_notebook.ipynb) |
+| Labyrinth | `labyrinth-v1` | Labyrinth Level | [`labyrinth/labyrinth_level_notebook.ipynb`](labyrinth/labyrinth_level_notebook.ipynb) |
+| Reservoir | `qrc-audio-v1` | Reservoir Audio | [`reservoir/reservoir_audio_notebook.ipynb`](reservoir/reservoir_audio_notebook.ipynb) |
+| | `qrc-midi-v1` | Reservoir MIDI | [`reservoir/reservoir_midi_notebook.ipynb`](reservoir/reservoir_midi_notebook.ipynb) |
+| Prism | `entanglement-shader-v1` | Prism Shader | [`prism/prism_shader_notebook.ipynb`](prism/prism_shader_notebook.ipynb) |
+| Entropy | `comet-qrng-v1` | Entropy Core | [`entropy/entropy_core_notebook.ipynb`](entropy/entropy_core_notebook.ipynb) |
 | | `coin-toss-v1` | Coin Toss | [`entropy/coin_toss_notebook.ipynb`](entropy/coin_toss_notebook.ipynb) |
 
 One folder per family; each holds its notebooks, their sample inputs and a README.
 
 ## Run a notebook
 
-You need a Moth API key from the Atlas **API keys** page. Set it as `MOTH_API_KEY`, or enter it when the notebook asks; it is never saved in the notebook. The `-staging` engines are served by the staging API: set `MOTH_API_BASE` to it (Atlas's own JupyterLab sets it for you).
+You need a Moth API key from the Atlas **API keys** page. Set it as `MOTH_API_KEY`, or enter it when the notebook asks; it is never saved in the notebook. To call a different API address, set `MOTH_API_BASE` (Atlas's own JupyterLab sets it for you).
 
 ```bash
 pip install -r requirements.txt
