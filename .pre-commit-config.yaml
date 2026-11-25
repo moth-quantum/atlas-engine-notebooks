@@ -1,0 +1,12 @@
+repos:
+-   repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+    -   id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+-   repo: local
+    hooks:
+    -   id: moth-api-key
+        name: Moth API key
+        language: pygrep
+        entry: 'moth_[0-9A-Za-z]{43}'
