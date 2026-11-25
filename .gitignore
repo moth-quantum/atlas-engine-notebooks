@@ -3,3 +3,6 @@ __pycache__/
 *.ipynb_checkpoints
 .DS_Store
 __marimo__/
+
+# Files the notebooks save when they run
+prism/shader_*.zip
